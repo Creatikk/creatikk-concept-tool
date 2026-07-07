@@ -86,14 +86,16 @@ async function handleAnalyze(input) {
     template.conceptIds.unshift(c.id);
   }
 
-  // Fiche « comment le reproduire » auto-générée (pour que le concept soit
-  // directement prêt côté créateur). Seulement si pas déjà présente.
-  if (!template.fiche) {
-    try { template.fiche = await callClaude(buildConceptSheet({ template, sources: db.sources.filter((s) => s.templateId === template.id) })); }
-    catch (e) { console.error('auto-fiche →', e.message); }
-  }
-
   store.save(db);
+
+  // Fiche « comment le reproduire » générée en TÂCHE DE FOND (n'allonge plus
+  // l'analyse) — apparaîtra sur le template quelques secondes après.
+  if (!template.fiche) {
+    const tid = template.id;
+    callClaude(buildConceptSheet({ template, sources: db.sources.filter((s) => s.templateId === tid) }))
+      .then((fiche) => { const d2 = store.load(); const t2 = d2.templates.find((t) => t.id === tid); if (t2 && !t2.fiche) { t2.fiche = fiche; store.save(d2); } })
+      .catch((e) => console.error('auto-fiche bg →', e.message));
+  }
   return {
     merged,
     diag: { transcript: !!transcript, frames: framesB64.length },
