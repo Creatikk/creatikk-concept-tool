@@ -7,7 +7,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { execFileSync } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const ffmpeg = require('ffmpeg-static');
 
 (function loadEnv() {
@@ -232,6 +232,31 @@ async function handleAssetDelete(input) {
 // versionné avec le repo. APNG choisi car son alpha est lu de façon FIABLE par
 // ffmpeg (VP9/WebM perdait la transparence → fond noir).
 const SCANFX = path.join(__dirname, 'assets_fx', 'scanfx.apng');
+
+// Compositing ffmpeg ASYNCHRONE + LÉGER (le serveur Render = 512 Mo RAM / 0.5 CPU :
+// un rendu 1080p bloquant faisait planter le process → 502). Ici : sortie 720×1280,
+// preset ultrafast, 1 thread, spawn non-bloquant, timeout, stderr capturé.
+function compositeScan(inPath, outPath) {
+  return new Promise((resolve) => {
+    const args = [
+      '-ignore_loop', '0', '-i', SCANFX,
+      '-i', inPath,
+      '-filter_complex',
+        '[1:v]scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,setsar=1[b];' +
+        '[0:v]scale=720:1280[fx];[b][fx]overlay=shortest=1,format=yuv420p[v]',
+      '-map', '[v]', '-map', '1:a?',
+      '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23', '-threads', '1',
+      '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', '-shortest',
+      '-y', outPath,
+    ];
+    const p = spawn(ffmpeg, args, { stdio: ['ignore', 'ignore', 'pipe'] });
+    let err = '';
+    p.stderr.on('data', (d) => { err += d; if (err.length > 8000) err = err.slice(-8000); });
+    const to = setTimeout(() => { try { p.kill('SIGKILL'); } catch {} }, 150000);
+    p.on('close', (code) => { clearTimeout(to); resolve({ code, stderr: err }); });
+    p.on('error', (e) => { clearTimeout(to); resolve({ code: -1, stderr: e.message }); });
+  });
+}
 // Reçoit la vidéo en BINAIRE BRUT (content-type: video/*, corps = octets du
 // fichier). Pas de base64/JSON → 33% plus léger + pas de parsing de longue
 // chaîne (le base64 dans du JSON échouait sur les .mov iPhone via le proxy Render).
@@ -251,24 +276,12 @@ async function handleScanVideo(req) {
   const outFile = id + '.mp4';
   const outPath = path.join(ASSETS_DIR, outFile);
   fs.writeFileSync(inPath, buf);
-  try {
-    // input 0 = overlay APNG bouclé (-ignore_loop 0) ; input 1 = vidéo créateur.
-    // 1) on cadre la vidéo en 9:16 plein cadre (cover + crop centré)
-    // 2) on superpose l'overlay, qui boucle jusqu'à la fin de la vidéo
-    //    (overlay=shortest=1), audio d'origine conservé.
-    execFileSync(ffmpeg, [
-      '-ignore_loop', '0', '-i', SCANFX,
-      '-i', inPath,
-      '-filter_complex',
-        '[1:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1[b];' +
-        '[0:v]scale=1080:1920[fx];[b][fx]overlay=shortest=1,format=yuv420p[v]',
-      '-map', '[v]', '-map', '1:a?',
-      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20',
-      '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', '-shortest',
-      '-y', outPath,
-    ], { stdio: 'ignore', maxBuffer: 1024 * 1024 * 64 });
-  } finally { try { fs.unlinkSync(inPath); } catch {} }
-  if (!fs.existsSync(outPath) || fs.statSync(outPath).size === 0) throw new Error('Le rendu vidéo a échoué.');
+  const r = await compositeScan(inPath, outPath);
+  try { fs.unlinkSync(inPath); } catch {}
+  if (r.code !== 0 || !fs.existsSync(outPath) || fs.statSync(outPath).size === 0) {
+    const tail = (r.stderr || '').split('\n').filter(Boolean).slice(-3).join(' | ').slice(-300);
+    throw new Error('Rendu échoué (code ' + r.code + ') ' + tail);
+  }
   return { url: '/assets/' + outFile, file: outFile };
 }
 
@@ -320,6 +333,20 @@ const server = http.createServer(async (req, res) => {
     if (u === '/asset-upload' && req.method === 'POST') return json(res, 200, await handleAssetUpload(await readBody(req)));
     if (u === '/asset-delete' && req.method === 'POST') return json(res, 200, await handleAssetDelete(await readBody(req)));
     if (u === '/scan-video' && req.method === 'POST') return json(res, 200, await handleScanVideo(req));
+    if (u === '/scan-selftest' && req.method === 'GET') {
+      // Diagnostic : compose le scan sur un clip GÉNÉRÉ (pas d'upload) → révèle
+      // si ffmpeg/overlay tourne sur cet environnement (Render) et pourquoi pas.
+      fs.mkdirSync(TMP, { recursive: true });
+      const tin = path.join(TMP, 'selftest_in.mp4');
+      const tout = path.join(TMP, 'selftest_out.mp4');
+      const g = spawnSync(ffmpeg, ['-y', '-f', 'lavfi', '-i', 'testsrc2=size=540x960:rate=24:duration=2', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', tin], { stdio: 'ignore' });
+      const rr = await compositeScan(tin, tout);
+      const ok = rr.code === 0 && fs.existsSync(tout) && fs.statSync(tout).size > 0;
+      const outSize = fs.existsSync(tout) ? fs.statSync(tout).size : 0;
+      try { fs.unlinkSync(tin); } catch {}
+      try { fs.unlinkSync(tout); } catch {}
+      return json(res, 200, { ok, ffmpeg: !!ffmpeg, scanfxExists: fs.existsSync(SCANFX), genCode: g.status, code: rr.code, outSize, stderrTail: (rr.stderr || '').slice(-700) });
+    }
     if (u === '/scanfx.apng' && (req.method === 'GET' || req.method === 'HEAD')) {
       // Aperçu animé de l'overlay (tuile « Animation d'analyse » côté créateur).
       if (!fs.existsSync(SCANFX)) return json(res, 404, { error: 'overlay absent' });
