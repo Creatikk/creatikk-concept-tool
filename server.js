@@ -43,6 +43,20 @@ function readBody(req) {
     req.on('end', () => { try { resolve(b ? JSON.parse(b) : {}); } catch { resolve({}); } });
   });
 }
+// Lit le corps BINAIRE brut (upload vidéo direct, sans base64/JSON) avec garde-fou taille.
+function readRaw(req, maxBytes) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0, killed = false;
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > maxBytes && !killed) { killed = true; reject(new Error('TOO_BIG')); req.destroy(); return; }
+      if (!killed) chunks.push(c);
+    });
+    req.on('end', () => { if (!killed) resolve(Buffer.concat(chunks)); });
+    req.on('error', (e) => { if (!killed) reject(e); });
+  });
+}
 const byForce = (a, b) => (b.force || 0) - (a.force || 0);
 
 // ── Analyse une vidéo → range dans un template → concepts d'amorce ──
@@ -218,17 +232,22 @@ async function handleAssetDelete(input) {
 // versionné avec le repo. APNG choisi car son alpha est lu de façon FIABLE par
 // ffmpeg (VP9/WebM perdait la transparence → fond noir).
 const SCANFX = path.join(__dirname, 'assets_fx', 'scanfx.apng');
-async function handleScanVideo(input) {
-  const m = /^data:([^;]+);base64,(.*)$/s.exec(input.dataUrl || '');
-  if (!m) throw new Error('Vidéo manquante ou invalide.');
-  if (!/^video\//.test(m[1])) throw new Error('Envoie une vidéo (mp4, mov ou webm).');
-  const buf = Buffer.from(m[2], 'base64');
-  if (buf.length > 80 * 1024 * 1024) throw new Error('Vidéo trop lourde (max 80 Mo).');
-  if (!fs.existsSync(SCANFX)) throw new Error("Overlay de scan absent (assets_fx/scanfx.webm) — relance le pré-rendu.");
+// Reçoit la vidéo en BINAIRE BRUT (content-type: video/*, corps = octets du
+// fichier). Pas de base64/JSON → 33% plus léger + pas de parsing de longue
+// chaîne (le base64 dans du JSON échouait sur les .mov iPhone via le proxy Render).
+async function handleScanVideo(req) {
+  const mime = (req.headers['content-type'] || '').split(';')[0].trim();
+  if (!/^video\//.test(mime)) throw new Error('Envoie une vidéo (mp4, mov ou webm).');
+  let buf;
+  try { buf = await readRaw(req, 150 * 1024 * 1024); }
+  catch (e) { throw new Error(e.message === 'TOO_BIG' ? 'Vidéo trop lourde (max 150 Mo).' : 'Upload interrompu.'); }
+  if (!buf || !buf.length) throw new Error('Vidéo vide.');
+  if (!fs.existsSync(SCANFX)) throw new Error("Overlay de scan absent (assets_fx/scanfx.apng) — relance le pré-rendu.");
   fs.mkdirSync(TMP, { recursive: true });
   fs.mkdirSync(ASSETS_DIR, { recursive: true });
   const id = store.genId('scan');
-  const inPath = path.join(TMP, id + '_in.' + extFromMime(m[1]));
+  const ext = extFromMime(mime) === 'bin' ? 'mp4' : extFromMime(mime);
+  const inPath = path.join(TMP, id + '_in.' + ext);
   const outFile = id + '.mp4';
   const outPath = path.join(ASSETS_DIR, outFile);
   fs.writeFileSync(inPath, buf);
@@ -300,7 +319,7 @@ const server = http.createServer(async (req, res) => {
     if (u === '/assets' && req.method === 'GET') return json(res, 200, store.load().assets);
     if (u === '/asset-upload' && req.method === 'POST') return json(res, 200, await handleAssetUpload(await readBody(req)));
     if (u === '/asset-delete' && req.method === 'POST') return json(res, 200, await handleAssetDelete(await readBody(req)));
-    if (u === '/scan-video' && req.method === 'POST') return json(res, 200, await handleScanVideo(await readBody(req)));
+    if (u === '/scan-video' && req.method === 'POST') return json(res, 200, await handleScanVideo(req));
     if (u === '/scanfx.apng' && (req.method === 'GET' || req.method === 'HEAD')) {
       // Aperçu animé de l'overlay (tuile « Animation d'analyse » côté créateur).
       if (!fs.existsSync(SCANFX)) return json(res, 404, { error: 'overlay absent' });

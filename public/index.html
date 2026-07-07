@@ -206,25 +206,24 @@ window._delAsset = async (id) => {
 // l'overlay Creatikk par-dessus et renvoie un MP4 téléchargeable.
 window.bindScan = () => {
   const btn = document.getElementById('scanGo'); if (!btn) return;
-  btn.onclick = () => {
+  btn.onclick = async () => {
     const file = document.getElementById('scanFile').files[0];
     const err = document.getElementById('scanErr'), out = document.getElementById('scanRes');
     err.textContent = ''; out.innerHTML = '';
     if (!file) { err.textContent = 'Choisis une vidéo.'; return; }
-    if (file.size > 80 * 1024 * 1024) { err.textContent = 'Vidéo trop lourde (max 80 Mo).'; return; }
-    const r = new FileReader();
+    if (file.size > 150 * 1024 * 1024) { err.textContent = 'Vidéo trop lourde (max 150 Mo).'; return; }
     btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Application du scan… (~20-40 s)';
-    r.onload = async () => {
-      try {
-        const res = await (await fetch('/scan-video', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ dataUrl: r.result }) })).json();
-        if (res.error) throw new Error(res.error);
-        out.innerHTML = `<video src="${res.url}" style="width:100%; max-width:280px; border-radius:12px; display:block" controls muted playsinline preload="metadata"></video>
-          <div style="margin-top:8px"><a class="pill" href="${res.url}" download>⬇️ Télécharger le MP4</a></div>
-          <div class="muted" style="font-size:12px; margin-top:4px">Prêt à poster (TikTok/Reels/Shorts).</div>`;
-      } catch (e) { err.textContent = e.message; }
-      btn.disabled = false; btn.textContent = '✨ Appliquer le scan';
-    };
-    r.readAsDataURL(file);
+    try {
+      // Envoi BINAIRE direct (le File comme corps de la requête) : pas de base64,
+      // pas de JSON → fiable sur iPhone/Render même pour les .mov lourds.
+      const resp = await fetch('/scan-video', { method: 'POST', headers: { 'content-type': file.type || 'video/mp4' }, body: file });
+      const res = await resp.json();
+      if (res.error) throw new Error(res.error);
+      out.innerHTML = `<video src="${res.url}" style="width:100%; max-width:280px; border-radius:12px; display:block" controls muted playsinline preload="metadata"></video>
+        <div style="margin-top:8px"><a class="pill" href="${res.url}" download>⬇️ Télécharger le MP4</a></div>
+        <div class="muted" style="font-size:12px; margin-top:4px">Prêt à poster (TikTok/Reels/Shorts).</div>`;
+    } catch (e) { err.textContent = e.message || 'Échec du rendu.'; }
+    btn.disabled = false; btn.textContent = '✨ Appliquer le scan';
   };
 };
 
