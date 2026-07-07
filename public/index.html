@@ -165,8 +165,8 @@ $('#tabS').onclick = () => showTab('S');
 // ── ASSETS (admin) ──
 function assetPreview(a) {
   return (a.mime || '').startsWith('video')
-    ? `<video src="/assets/${a.file}" style="width:100%; border-radius:8px" muted playsinline></video>`
-    : `<img src="/assets/${a.file}" style="width:100%; border-radius:8px" />`;
+    ? `<video src="/assets/${a.file}" style="width:100%; border-radius:8px" controls muted playsinline preload="metadata"></video>`
+    : `<a href="/assets/${a.file}" target="_blank" title="voir en grand"><img src="/assets/${a.file}" style="width:100%; border-radius:8px; display:block" /></a>`;
 }
 async function loadAssets() {
   $('#resS').innerHTML = '<div class="card muted">Chargement…</div>';
@@ -176,7 +176,7 @@ async function loadAssets() {
     $('#resS').innerHTML = '<div class="agrid">' + list.map((a) => `<div class="atile">${assetPreview(a)}
       <div class="rowline" style="margin-top:6px"><b style="flex:1; font-size:13px">${esc(a.nom)}</b></div>
       <div class="muted" style="font-size:12px">${esc(a.category)}</div>
-      <div style="margin-top:6px"><a class="pill" href="/assets/${a.file}" download>⬇️ télécharger</a> <button class="ghost mini" onclick="_delAsset('${a.id}')">🗑️</button></div>
+      <div style="margin-top:6px"><a class="pill" href="/assets/${a.file}" target="_blank">👁️ voir</a> <a class="pill" href="/assets/${a.file}" download>⬇️</a> <button class="ghost mini" onclick="_delAsset('${a.id}')">🗑️ supprimer</button></div>
     </div>`).join('') + '</div>';
   } catch (e) { $('#resS').innerHTML = '<div class="err">' + e.message + '</div>'; }
 }
@@ -257,8 +257,7 @@ function renderAnalysis(d) {
         <div class="kv"><b>Intégration produit</b>${esc(a.integrationProduit)}</div><div class="kv"><b>Format · CTA</b>${esc(a.format)} · ${esc(a.cta)}</div>
       </div>
     </details>
-    <h3 style="margin:16px 0 8px; font-size:16px">Adaptations Creatikk (ajoutées à « Mes concepts »)</h3>`;
-  (a.adaptationsCreatikk || []).forEach((c, i) => (html += conceptCard(c, 'a' + i)));
+    <div class="banner merge" style="margin-top:16px">✍️ Les <b>scripts prêts à filmer</b> se génèrent en arrière-plan (~1 min). Tu les retrouves dans le concept : onglet <b>Templates → Ouvrir le dossier</b> (et côté créateur).</div>`;
   return html + '</div>';
 }
 $('#goA').onclick = async () => {
@@ -297,20 +296,40 @@ async function loadTemplates() {
 }
 function tplStats(id) {
   const srcs = TDATA.sources.filter((s) => s.templateId === id);
-  const views = srcs.reduce((a, s) => a + (s.meta?.views || 0), 0);
-  return { srcs, views };
+  const vv = srcs.map((s) => s.meta?.views || 0);
+  const views = vv.reduce((a, b) => a + b, 0);
+  const nb = srcs.length;
+  const avg = nb ? Math.round(views / nb) : 0;
+  const best = vv.length ? Math.max(...vv) : 0;
+  // « en ce moment » : moyenne des vidéos publiées récemment (< 45 j)
+  const cutoff = Date.now() - 45 * 864e5;
+  const recent = srcs.filter((s) => s.meta?.postDate && new Date(s.meta.postDate).getTime() > cutoff).map((s) => s.meta.views || 0);
+  const recentAvg = recent.length ? Math.round(recent.reduce((a, b) => a + b, 0) / recent.length) : avg;
+  return { srcs, views, nb, avg, best, recentAvg };
+}
+// LE concept qui performe le mieux en ce moment (moyenne des vidéos récentes)
+function topConceptId() {
+  let top = null, bs = -1;
+  for (const t of TDATA.templates) { const m = tplStats(t.id); if (m.nb > 0 && m.recentAvg > bs) { bs = m.recentAvg; top = t.id; } }
+  return top;
+}
+// Lien TikTok compact (hyperlien court + vues + $ gagné)
+function vidLink(s) {
+  return `<a class="pill" href="${esc(s.url)}" target="_blank">🔗 @${esc(s.meta && s.meta.author || 'vidéo')}</a> <span class="muted">${fmtN(s.meta && s.meta.views)} vues = ${dollars(s.meta && s.meta.views)} pour le créateur</span>`;
 }
 function renderTemplateList() {
-  let t = TDATA.templates;
+  let t = [...TDATA.templates];
   const f = $('#tFilter').value.trim().toLowerCase();
   if (f) t = t.filter((x) => (x.niches || []).join(' ').toLowerCase().includes(f) || (x.nom || '').toLowerCase().includes(f));
   if (!t.length) { $('#resT').innerHTML = '<div class="card muted">Aucun concept. Analyse des vidéos pour en créer.</div>'; return; }
+  const top = topConceptId();
+  t.sort((a, b) => tplStats(b.id).recentAvg - tplStats(a.id).recentAvg);
   $('#resT').innerHTML = t.map((x) => {
     const st = tplStats(x.id);
     return `<div class="card tcard">
-      <div class="rowline"><b style="flex:1; font-size:16px">${esc(x.nom)}</b><span class="pill force">force ${x.force}</span>${x.winner ? '<span class="pill win">🏆</span>' : ''}</div>
+      <div class="rowline"><b style="flex:1; font-size:16px">${esc(x.nom)}</b>${x.id === top ? '<span class="pill win">🔥 cartonne le plus</span>' : ''}<span class="pill force">force ${x.force}</span></div>
       <div class="tmpl">${esc(x.formule)}</div>
-      <div class="rowline" style="margin-top:8px"><span class="pill">${st.srcs.length} vidéo(s)</span><span class="pill">${fmtN(st.views)} vues cumulées</span><span class="pill win">💰 ${dollars(st.views)} à 1$/1000</span></div>
+      <div class="rowline" style="margin-top:8px"><span class="pill">${st.nb} vidéo(s)</span><span class="pill">moy. ${fmtN(st.avg)} = ${dollars(st.avg)}</span><span class="pill win">max ${fmtN(st.best)} = ${dollars(st.best)}</span></div>
       <div style="margin-top:10px"><button class="mini" onclick="_open('${x.id}')">📂 Ouvrir le dossier</button>
         <button class="ghost mini" onclick="_gen('${x.id}','${esc((x.niches || [])[0] || '').replace(/'/g, '')}','${esc(x.nom).replace(/'/g, '')}')">✨ Générer</button></div>
     </div>`;
@@ -329,13 +348,13 @@ function renderConceptDetail(id) {
        <div class="scriptlbl">🚫 À éviter</div><ul class="ul">${(f.aEviter || []).map((e) => '<li>' + esc(e) + '</li>').join('')}</ul>`
     : `<div class="muted">Pas encore de fiche. <button class="mini" id="sheetBtn" onclick="_sheet('${id}')">✨ Générer la fiche « comment le reproduire »</button></div>`;
   const exHtml = st.srcs.length
-    ? st.srcs.map((s) => `<div class="rowline" style="margin:6px 0"><a href="${esc(s.url)}" target="_blank" style="flex:1; min-width:160px">${esc(s.sujet || s.url)}</a><span class="pill">${fmtN(s.meta?.views)} vues</span><span class="pill win">${dollars(s.meta?.views)}</span></div>`).join('')
+    ? st.srcs.map((s) => `<div class="rowline" style="margin:7px 0">${vidLink(s)}</div>`).join('')
     : '<div class="muted">Aucune vidéo encore.</div>';
   $('#resT').innerHTML = `<div class="card">
     <button class="ghost mini" onclick="renderTemplateList()">← retour</button>
-    <div class="rowline" style="margin-top:10px"><b style="flex:1; font-size:19px">${esc(x.nom)}</b><span class="pill force">force ${x.force}</span>${x.winner ? '<span class="pill win">🏆 winner</span>' : ''}</div>
+    <div class="rowline" style="margin-top:10px"><b style="flex:1; font-size:19px">${esc(x.nom)}</b>${id === topConceptId() ? '<span class="pill win">🔥 cartonne le plus</span>' : ''}<span class="pill force">force ${x.force}</span></div>
     <div class="tmpl">${esc(x.formule)}</div>
-    <div class="rowline"><span class="pill">${st.srcs.length} vidéo(s)</span><span class="pill">${fmtN(st.views)} vues cumulées</span><span class="pill win">💰 ${dollars(st.views)} à 1$/1000 vues</span></div>
+    <div class="rowline"><span class="pill">${st.nb} vidéo(s)</span><span class="pill">moyenne ${fmtN(st.avg)} = ${dollars(st.avg)}</span><span class="pill win">meilleure ${fmtN(st.best)} = ${dollars(st.best)}</span></div>
     <button class="mini" style="margin-top:11px" onclick="_copyDossier('${id}')">📋 Copier le dossier (à envoyer à un créateur)</button>
     <h3 style="margin:18px 0 6px; font-size:16px">📋 Fiche — comment le reproduire</h3>
     ${ficheHtml}
@@ -428,7 +447,7 @@ function assetsLibraryHtml() {
   const list = TDATA.assets || [];
   if (!list.length) return '<div class="card muted">Aucune ressource pour l\'instant. Elles apparaîtront ici dès qu\'elles sont ajoutées.</div>';
   const cats = [...new Set(list.map((a) => a.category || 'Autre'))];
-  return cats.map((cat) => `<h3 style="margin:16px 0 6px; font-size:16px">${esc(cat)}</h3><div class="agrid">` + list.filter((a) => (a.category || 'Autre') === cat).map((a) => `<div class="atile">${assetPreview(a)}<div class="muted" style="font-size:12px; margin-top:5px">${esc(a.nom)}</div><a class="pill" href="/assets/${a.file}" download>⬇️ télécharger</a></div>`).join('') + '</div>').join('');
+  return cats.map((cat) => `<h3 style="margin:16px 0 6px; font-size:16px">${esc(cat)}</h3><div class="agrid">` + list.filter((a) => (a.category || 'Autre') === cat).map((a) => `<div class="atile">${assetPreview(a)}<div class="muted" style="font-size:12px; margin:5px 0">${esc(a.nom)}</div><a class="pill" href="/assets/${a.file}" target="_blank">👁️ voir</a> <a class="pill" href="/assets/${a.file}" download>⬇️ télécharger</a></div>`).join('') + '</div>').join('');
 }
 function renderResources() {
   document.getElementById('creatorApp').innerHTML = CNAV('res') + `<div class="card">
@@ -445,12 +464,14 @@ async function initCreator() {
 function renderCatalogue() {
   const el = document.getElementById('cCat'); if (!el) return;
   if (!TDATA.templates.length) { el.innerHTML = '<div class="card muted">Concepts bientôt disponibles.</div>'; return; }
-  el.innerHTML = TDATA.templates.map((x) => {
-    const bv = bestVid(x.id);
+  const top = topConceptId();
+  const list = [...TDATA.templates].sort((a, b) => tplStats(b.id).recentAvg - tplStats(a.id).recentAvg);
+  el.innerHTML = list.map((x) => {
+    const st = tplStats(x.id);
     return `<div class="card">
-      <div class="rowline"><b style="flex:1; font-size:17px">${esc(x.nom)}</b>${x.winner ? '<span class="pill win">🏆 winner</span>' : ''}</div>
+      <div class="rowline"><b style="flex:1; font-size:17px">${esc(x.nom)}</b>${x.id === top ? '<span class="pill win">🔥 cartonne le plus en ce moment</span>' : ''}</div>
       <div class="muted" style="margin-top:4px">${esc(x.formule)}</div>
-      ${bv ? `<div class="gain">💰 Meilleure vidéo : ${fmtN(bv.meta.views)} vues = ${dollars(bv.meta.views)}</div>` : ''}
+      ${st.nb ? `<div class="gain">💰 Meilleure : ${fmtN(st.best)} vues = ${dollars(st.best)} · Moyenne : ${fmtN(st.avg)} = ${dollars(st.avg)}</div>` : ''}
       <button class="mini" style="margin-top:8px" onclick="_openC('${x.id}')">Voir le concept →</button>
     </div>`;
   }).join('');
@@ -463,19 +484,19 @@ function ficheCreator(f) {
 }
 window._openC = (id) => {
   const x = TDATA.templates.find((t) => t.id === id); if (!x) return;
-  const bv = bestVid(id), f = x.fiche;
+  const bv = bestVid(id), f = x.fiche, st = tplStats(id);
   const concepts = TDATA.concepts.filter((c) => c.templateId === id);
   const srcs = TDATA.sources.filter((s) => s.templateId === id);
   document.getElementById('creatorApp').innerHTML = `<button class="ghost mini" onclick="initCreator()">← retour aux concepts</button>
     <div class="card" style="margin-top:12px">
       <h2 style="margin:4px 0; font-size:22px">${esc(x.nom)}</h2>
-      ${bv ? `<div class="gain big">💰 La meilleure vidéo de ce concept a fait <b>${fmtN(bv.meta.views)} vues</b> = <b>${dollars(bv.meta.views)}</b> pour son créateur</div>` : ''}
+      ${st.nb ? `<div class="gain big">💰 Meilleure vidéo : <b>${fmtN(st.best)} vues = ${dollars(st.best)}</b> · En moyenne ce concept fait <b>${fmtN(st.avg)} vues = ${dollars(st.avg)}</b> pour le créateur</div>` : ''}
       <div class="simu">Toi, à 1 $/1000 vues : 100k = 100 $ · 500k = 500 $ · 1M = 1 000 $</div>
       <h3 style="margin:18px 0 8px; font-size:16px">📋 Comment le faire</h3>
       ${f ? ficheCreator(f) : '<div class="muted">Fiche détaillée bientôt disponible.</div>'}
       <div style="margin:14px 0"><button class="ghost mini" onclick="renderResources()">🎁 Voir les ressources à utiliser (chargements Creatikk…)</button></div>
       <h3 style="margin:18px 0 8px; font-size:16px">🎬 Des vidéos qui ont cartonné avec ce concept</h3>
-      ${srcs.length ? srcs.map((s) => `<div class="rowline" style="margin:6px 0"><a href="${esc(s.url)}" target="_blank" style="flex:1; min-width:160px">${esc(s.sujet || s.url)}</a><span class="pill win">${fmtN(s.meta && s.meta.views)} vues</span></div>`).join('') : '<div class="muted">—</div>'}
+      ${srcs.length ? srcs.map((s) => `<div class="rowline" style="margin:7px 0">${vidLink(s)}</div>`).join('') : '<div class="muted">—</div>'}
       ${concepts.length ? '<h3 style="margin:18px 0 8px; font-size:16px">✍️ Scripts prêts à filmer</h3>' + concepts.map((c, i) => conceptCard(c, 'cc' + i)).join('') : ''}
     </div>`;
   window.scrollTo(0, 0);

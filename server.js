@@ -20,7 +20,7 @@ const path = require('path');
   }
 })();
 
-const { callClaude, buildAnalyze, buildClassify, buildGenerate, buildConceptSheet } = require('./lib/claude');
+const { callClaude, buildAnalyze, buildClassify, buildGenerate, buildConceptSheet, buildAdaptations } = require('./lib/claude');
 const tiktok = require('./lib/tiktok');
 const { transcribe } = require('./lib/transcribe');
 const { extractFrames, countCuts } = require('./lib/frames');
@@ -60,7 +60,7 @@ async function handleAnalyze(input) {
     try { info.meta.cuts = countCuts(mp4); } catch {}
   } finally { try { fs.unlinkSync(mp4); } catch {} }
 
-  const analysis = await callClaude({ ...buildAnalyze({ meta: info.meta, transcript, framesB64 }), maxTokens: 7500 });
+  const analysis = await callClaude({ ...buildAnalyze({ meta: info.meta, transcript, framesB64 }), maxTokens: 4500 });
 
   const db = store.load();
   // Fusion : ce concept correspond-il à un template connu ?
@@ -79,23 +79,28 @@ async function handleAnalyze(input) {
   db.sources.unshift(source);
   template.exempleIds.unshift(source.id);
 
-  // Les adaptations de l'analyse deviennent des concepts (statut idée)
-  for (const a of analysis.adaptationsCreatikk || []) {
-    const c = { id: store.genId('c'), templateId: template.id, templateNom: template.nom, niche: (template.niches || [])[0] || '', titre: a.titre, hook: a.hook, astuceGratuite: a.astuceGratuite, scriptVerbatim: a.scriptVerbatim, notesTournage: a.notesTournage, format: a.format, statut: 'idee', origine: 'analyse', sourceUrl: url, createdAt: now() };
-    db.concepts.unshift(c);
-    template.conceptIds.unshift(c.id);
-  }
-
   store.save(db);
 
-  // Fiche « comment le reproduire » générée en TÂCHE DE FOND (n'allonge plus
-  // l'analyse) — apparaîtra sur le template quelques secondes après.
-  if (!template.fiche) {
-    const tid = template.id;
-    callClaude(buildConceptSheet({ template, sources: db.sources.filter((s) => s.templateId === tid) }))
-      .then((fiche) => { const d2 = store.load(); const t2 = d2.templates.find((t) => t.id === tid); if (t2 && !t2.fiche) { t2.fiche = fiche; store.save(d2); } })
-      .catch((e) => console.error('auto-fiche bg →', e.message));
-  }
+  // EN TÂCHE DE FOND (n'allonge plus l'analyse, qui s'affiche vite) : les 3
+  // scripts d'adaptation prêts à filmer + la fiche. Ils apparaissent dans le
+  // concept ~1 min après l'analyse.
+  const tid = template.id;
+  (async () => {
+    try {
+      const out = await callClaude(buildAdaptations({ analysis }));
+      const d2 = store.load();
+      const t2 = d2.templates.find((t) => t.id === tid);
+      if (!t2) return;
+      for (const a of out.adaptations || []) {
+        const c = { id: store.genId('c'), templateId: tid, templateNom: t2.nom, niche: (t2.niches || [])[0] || '', titre: a.titre, hook: a.hook, astuceGratuite: a.astuceGratuite, scriptVerbatim: a.scriptVerbatim, notesTournage: a.notesTournage, format: a.format, statut: 'idee', origine: 'analyse', sourceUrl: url, createdAt: now() };
+        d2.concepts.unshift(c);
+        t2.conceptIds.unshift(c.id);
+      }
+      if (!t2.fiche) { try { t2.fiche = await callClaude(buildConceptSheet({ template: t2, sources: d2.sources.filter((s) => s.templateId === tid) })); } catch (e) { console.error('fiche bg →', e.message); } }
+      store.save(d2);
+    } catch (e) { console.error('adaptations bg →', e.message); }
+  })();
+
   return {
     merged,
     diag: { transcript: !!transcript, frames: framesB64.length },
