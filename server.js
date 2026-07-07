@@ -103,6 +103,20 @@ async function handleAnalyze(input) {
   };
 }
 
+// Analyse ASYNCHRONE : une requête HTTP tenue ~2 min est coupée par les
+// proxies (Render) / navigateurs. On lance en tâche de fond et l'interface
+// interroge /analyze-status jusqu'à la fin.
+const jobs = {};
+function startAnalyze(input) {
+  const id = store.genId('job');
+  jobs[id] = { status: 'pending', _t: Date.now() };
+  handleAnalyze(input)
+    .then((result) => { jobs[id] = { status: 'done', result, _t: Date.now() }; })
+    .catch((e) => { console.error('analyze job →', e.message); jobs[id] = { status: 'error', error: e.message, _t: Date.now() }; });
+  for (const k of Object.keys(jobs)) if (Date.now() - jobs[k]._t > 6e5) delete jobs[k]; // purge > 10 min
+  return { jobId: id };
+}
+
 // ── Génère des concepts à partir des templates ─────────────────────
 async function handleGenerate(input) {
   const niche = (input.niche || '').trim();
@@ -186,7 +200,12 @@ const server = http.createServer(async (req, res) => {
     if (u === '/templates' && req.method === 'GET') return json(res, 200, store.load().templates.sort(byForce));
     if (u === '/sources' && req.method === 'GET') return json(res, 200, store.load().sources);
     if (u === '/concepts' && req.method === 'GET') return json(res, 200, store.load().concepts);
-    if (u === '/analyze' && req.method === 'POST') return json(res, 200, await handleAnalyze(await readBody(req)));
+    if (u === '/analyze' && req.method === 'POST') return json(res, 200, startAnalyze(await readBody(req)));
+    if (u === '/analyze-status' && req.method === 'GET') {
+      const id = new URLSearchParams(req.url.split('?')[1] || '').get('id');
+      const j = jobs[id] || { status: 'unknown' };
+      return json(res, 200, { status: j.status, result: j.result, error: j.error });
+    }
     if (u === '/generate' && req.method === 'POST') return json(res, 200, await handleGenerate(await readBody(req)));
     if (u === '/concept-sheet' && req.method === 'POST') return json(res, 200, await handleConceptSheet(await readBody(req)));
     if (u === '/assets' && req.method === 'GET') return json(res, 200, store.load().assets);

@@ -265,11 +265,19 @@ $('#goA').onclick = async () => {
   const url = $('#url').value.trim(); $('#errA').textContent = '';
   if (!url) { $('#errA').textContent = 'Colle un lien.'; return; }
   $('#goA').disabled = true; $('#goA').innerHTML = '<span class="spin"></span> Analyse…';
-  $('#resA').innerHTML = '<div class="card muted">Téléchargement → transcription → 12 images → analyse → rangement dans un template… (~1 à 1,5 min)</div>';
+  $('#resA').innerHTML = '<div class="card muted">Téléchargement → transcription → 12 images → analyse → rangement dans un template… (~1 à 2 min, patiente, ça tourne)</div>';
   try {
-    const r = await (await fetch('/analyze', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url, transcript: $('#transcript').value }) })).json();
-    if (r.error) throw new Error(r.error);
-    $('#resA').innerHTML = renderAnalysis(r); health();
+    const start = await (await fetch('/analyze', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url, transcript: $('#transcript').value }) })).json();
+    if (start.error) throw new Error(start.error);
+    let result = null;
+    for (let i = 0; i < 100; i++) { // interroge le statut jusqu'à ~5 min
+      await new Promise((r) => setTimeout(r, 3000));
+      const st = await (await fetch('/analyze-status?id=' + start.jobId)).json();
+      if (st.status === 'done') { result = st.result; break; }
+      if (st.status === 'error') throw new Error(st.error);
+    }
+    if (!result) throw new Error('Délai dépassé — réessaie.');
+    $('#resA').innerHTML = renderAnalysis(result); health();
   } catch (e) { $('#resA').innerHTML = ''; $('#errA').textContent = e.message; }
   $('#goA').disabled = false; $('#goA').textContent = 'Analyser';
 };
