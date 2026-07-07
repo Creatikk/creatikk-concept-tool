@@ -356,6 +356,8 @@ function renderConceptDetail(id) {
     <div class="rowline" style="margin-top:10px"><b style="flex:1; font-size:19px">${esc(x.nom)}</b>${id === topConceptId() ? '<span class="pill win">🔥 cartonne le plus</span>' : ''}<span class="pill force">force ${x.force}</span></div>
     <div class="tmpl">${esc(x.formule)}</div>
     <div class="rowline"><span class="pill">${st.nb} vidéo(s)</span><span class="pill">moyenne ${fmtN(st.avg)} = ${dollars(st.avg)}</span><span class="pill win">meilleure ${fmtN(st.best)} = ${dollars(st.best)}</span></div>
+    ${x.pourquoiCaMarche ? `<div class="kv" style="margin-top:10px"><b>🧠 Pourquoi ça marche (synthèse ${st.nb} vidéos)</b>${esc(x.pourquoiCaMarche)}</div>` : ''}
+    ${x.hookPatterns && x.hookPatterns.length ? `<div class="scriptlbl" style="margin-top:10px">🎣 Patterns de hook récurrents (affinés sur ${st.nb} vidéos)</div><ul class="ul">${x.hookPatterns.map((h) => '<li>' + esc(h) + '</li>').join('')}</ul>` : `<div class="muted" style="margin-top:8px; font-size:12px">💡 Analyse une 2ᵉ vidéo de ce style pour affiner la formule et faire ressortir les patterns de hook.</div>`}
     <button class="mini" style="margin-top:11px" onclick="_copyDossier('${id}')">📋 Copier le dossier (à envoyer à un créateur)</button>
     <h3 style="margin:18px 0 6px; font-size:16px">📋 Fiche — comment le reproduire</h3>
     ${ficheHtml}

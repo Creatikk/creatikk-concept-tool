@@ -20,7 +20,7 @@ const path = require('path');
   }
 })();
 
-const { callClaude, buildAnalyze, buildClassify, buildGenerate, buildConceptSheet, buildAdaptations } = require('./lib/claude');
+const { callClaude, buildAnalyze, buildClassify, buildGenerate, buildConceptSheet, buildAdaptations, buildRefineTemplate } = require('./lib/claude');
 const tiktok = require('./lib/tiktok');
 const { transcribe } = require('./lib/transcribe');
 const { extractFrames, countCuts } = require('./lib/frames');
@@ -101,7 +101,21 @@ async function handleAnalyze(input) {
         d2.concepts.unshift(c);
         t2.conceptIds.unshift(c.id);
       }
-      if (!t2.fiche) { try { t2.fiche = await callClaude(buildConceptSheet({ template: t2, sources: d2.sources.filter((s) => s.templateId === tid) })); } catch (e) { console.error('fiche bg →', e.message); } }
+      const srcsAll = d2.sources.filter((s) => s.templateId === tid);
+      // Le template s'affine dès qu'il a ≥2 vidéos (plus il y en a, plus il est précis).
+      if (srcsAll.length >= 2) {
+        try {
+          const ref = await callClaude(buildRefineTemplate({ template: t2, sources: srcsAll }));
+          if (ref.nom) t2.nom = ref.nom;
+          if (ref.formule) t2.formule = ref.formule;
+          if (ref.ressorts) t2.ressorts = ref.ressorts;
+          if (ref.hookPatterns) t2.hookPatterns = ref.hookPatterns;
+          if (ref.pourquoiCaMarche) t2.pourquoiCaMarche = ref.pourquoiCaMarche;
+          if (ref.niches) t2.niches = Array.from(new Set([...(t2.niches || []), ...ref.niches]));
+          t2.fiche = null; // fiche à régénérer sur la formule affinée
+        } catch (e) { console.error('refine bg →', e.message); }
+      }
+      if (!t2.fiche) { try { t2.fiche = await callClaude(buildConceptSheet({ template: t2, sources: srcsAll })); } catch (e) { console.error('fiche bg →', e.message); } }
       store.save(d2);
     } catch (e) { console.error('adaptations bg →', e.message); }
   })();
@@ -200,10 +214,27 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       return res.end(fs.readFileSync(path.join(__dirname, 'public', 'index.html')));
     }
-    if (req.method === 'GET' && u.startsWith('/assets/')) {
+    if ((req.method === 'GET' || req.method === 'HEAD') && u.startsWith('/assets/')) {
       const fp = path.join(ASSETS_DIR, path.basename(u));
-      if (fs.existsSync(fp)) { res.writeHead(200, { 'content-type': MIME[fp.split('.').pop().toLowerCase()] || 'application/octet-stream' }); return res.end(fs.readFileSync(fp)); }
-      return json(res, 404, { error: 'asset introuvable' });
+      if (!fs.existsSync(fp)) return json(res, 404, { error: 'asset introuvable' });
+      const stat = fs.statSync(fp);
+      const type = MIME[fp.split('.').pop().toLowerCase()] || 'application/octet-stream';
+      const range = req.headers.range;
+      // Support du streaming (Range/206) — requis pour lire les vidéos sur iOS Safari.
+      if (range) {
+        const m = /bytes=(\d*)-(\d*)/.exec(range) || [];
+        let start = m[1] ? parseInt(m[1], 10) : 0;
+        let end = m[2] ? parseInt(m[2], 10) : stat.size - 1;
+        if (isNaN(start)) start = 0;
+        if (isNaN(end) || end >= stat.size) end = stat.size - 1;
+        if (start > end) { res.writeHead(416, { 'content-range': `bytes */${stat.size}` }); return res.end(); }
+        res.writeHead(206, { 'content-type': type, 'accept-ranges': 'bytes', 'content-range': `bytes ${start}-${end}/${stat.size}`, 'content-length': end - start + 1 });
+        if (req.method === 'HEAD') return res.end();
+        return fs.createReadStream(fp, { start, end }).pipe(res);
+      }
+      res.writeHead(200, { 'content-type': type, 'accept-ranges': 'bytes', 'content-length': stat.size });
+      if (req.method === 'HEAD') return res.end();
+      return fs.createReadStream(fp).pipe(res);
     }
     if (u === '/health') {
       const db = store.load();
