@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Creatikk — Usine à concepts</title>
+<style>
+  :root{ --blue:#147FFB; --purple:#940EFB; --bg:#070509; --card:#12101a; --card2:#1a1725; --line:#292437; --txt:#ece9f5; --mut:#9a93ad; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--txt); font-family:"Satoshi",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; line-height:1.5; }
+  .wrap{ max-width:920px; margin:0 auto; padding:26px 18px 90px; }
+  h1{ font-size:25px; margin:0 0 2px; background:linear-gradient(90deg,var(--blue),var(--purple)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .sub{ color:var(--mut); font-size:13px; margin-bottom:20px; }
+  .card{ background:var(--card); border:1px solid var(--line); border-radius:16px; padding:18px; margin-bottom:14px; }
+  label{ display:block; font-size:13px; color:var(--mut); margin:0 0 6px; }
+  input,textarea,select{ width:100%; background:var(--bg); border:1px solid var(--line); color:var(--txt); border-radius:10px; padding:11px; font:inherit; }
+  textarea{ min-height:64px; resize:vertical; }
+  .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+  .row>*{ flex:1; min-width:120px; }
+  button{ cursor:pointer; border:none; border-radius:10px; padding:11px 16px; font-weight:600; font:inherit; color:#fff; background:linear-gradient(90deg,var(--blue),var(--purple)); }
+  button.ghost{ background:transparent; border:1px solid var(--line); color:var(--txt); }
+  button.mini{ padding:6px 11px; font-size:12px; font-weight:500; }
+  button:disabled{ opacity:.5; cursor:default; }
+  .tabs{ display:flex; gap:7px; margin-bottom:16px; flex-wrap:wrap; }
+  .tabs button{ flex:1; min-width:130px; }
+  .muted{ color:var(--mut); font-size:13px; }
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+  .kv{ background:var(--card2); border:1px solid var(--line); border-radius:10px; padding:9px 11px; font-size:13px; }
+  .kv b{ display:block; font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:var(--blue); margin-bottom:3px; }
+  .score{ font-size:32px; font-weight:800; line-height:1; }
+  .pill{ display:inline-block; font-size:11px; padding:3px 9px; border-radius:999px; background:var(--card2); border:1px solid var(--line); color:var(--mut); margin:2px 4px 2px 0; }
+  .pill.force{ background:rgba(148,14,251,.16); border-color:var(--purple); color:#d9b6ff; font-weight:600; }
+  .pill.win{ background:rgba(20,127,251,.16); border-color:var(--blue); color:#a9d0ff; }
+  .concept{ background:var(--card2); border:1px solid var(--line); border-radius:12px; padding:13px; margin-top:9px; }
+  .concept h4{ margin:0 0 6px; font-size:15px; }
+  .hook{ color:#d9b6ff; font-weight:600; }
+  .gift{ background:rgba(20,127,251,.12); border:1px solid var(--blue); border-radius:9px; padding:8px 11px; margin:9px 0; font-size:13.5px; }
+  .scriptlbl{ font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--purple); margin:11px 0 4px; font-weight:600; }
+  .script{ background:var(--bg); border:1px solid var(--line); border-radius:9px; padding:11px; white-space:pre-wrap; font-size:14px; line-height:1.6; }
+  .ul{ margin:6px 0 8px; padding-left:20px; } .ul li{ margin:4px 0; font-size:14px; }
+  .hero{ text-align:center; padding:24px 10px 6px; }
+  .badge{ display:inline-block; font-size:12px; color:#d9b6ff; border:1px solid var(--purple); border-radius:999px; padding:4px 12px; margin-bottom:14px; }
+  .heroTitle{ font-size:30px; margin:6px 0; }
+  .heroTitle span{ background:linear-gradient(90deg,var(--blue),var(--purple)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .heroSub{ color:var(--mut); max-width:560px; margin:8px auto 16px; font-size:15px; }
+  .steps{ display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin:8px 0 14px; }
+  .step{ background:var(--card2); border:1px solid var(--line); border-radius:12px; padding:12px 14px; font-size:13px; flex:1; min-width:150px; text-align:left; }
+  .step b{ color:var(--blue); display:block; margin-bottom:3px; }
+  .simu{ background:rgba(20,127,251,.1); border:1px solid var(--blue); border-radius:10px; padding:9px 12px; font-size:14px; display:inline-block; margin:6px 0; }
+  .gain{ background:rgba(148,14,251,.12); border:1px solid var(--purple); border-radius:9px; padding:8px 11px; margin:9px 0; font-size:14px; }
+  .gain.big{ font-size:16px; }
+  .agrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; }
+  .atile{ background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px; }
+  .paidbar{ background:linear-gradient(90deg,rgba(20,127,251,.16),rgba(148,14,251,.16)); border:1px solid var(--purple); border-radius:12px; padding:12px 16px; margin:10px auto 4px; max-width:520px; font-size:15px; }
+  .simuBox{ background:var(--card2); border:1px solid var(--line); border-radius:12px; padding:14px 16px; max-width:460px; margin:12px auto; }
+  .simuOut{ font-size:19px; margin-top:10px; }
+  .simuOut b{ color:#a9d0ff; }
+  .payinfo{ color:var(--txt); background:rgba(148,14,251,.1); border:1px solid var(--purple); border-radius:10px; padding:9px 13px; font-size:14px; margin:10px auto 0; max-width:520px; display:inline-block; }
+  input[type=range]{ accent-color:var(--purple); width:100%; }
+  .assethint{ color:var(--mut); font-size:13px; margin:2px 0 8px; }
+  .promesse{ background:var(--card2); border:1px solid var(--line); border-radius:12px; padding:15px 18px; max-width:480px; margin:14px auto; text-align:left; }
+  .pline{ font-size:14.5px; margin:7px 0; }
+  .ppunch{ font-size:18px; font-weight:600; margin-top:12px; text-align:center; background:linear-gradient(90deg,var(--blue),var(--purple)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .cnav{ display:flex; gap:8px; justify-content:center; margin-bottom:14px; }
+  .cnav button{ padding:8px 18px; }
+  details{ margin-top:8px; } summary{ cursor:pointer; color:var(--mut); font-size:13px; user-select:none; }
+  .tmpl{ border-left:3px solid var(--purple); padding-left:11px; margin:10px 0; font-size:14px; }
+  .banner{ border-radius:10px; padding:10px 13px; margin-bottom:12px; font-size:14px; }
+  .banner.new{ background:rgba(148,14,251,.14); border:1px solid var(--purple); }
+  .banner.merge{ background:rgba(20,127,251,.14); border:1px solid var(--blue); }
+  .err{ color:#ff8080; font-size:14px; }
+  .spin{ display:inline-block; width:14px; height:14px; border:2px solid #fff5; border-top-color:#fff; border-radius:50%; animation:s .7s linear infinite; vertical-align:-2px; }
+  @keyframes s{ to{ transform:rotate(360deg);} }
+  .hidden{ display:none; }
+  a{ color:var(--blue); }
+  .tcard{ cursor:default; }
+  .rowline{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="creatorApp"></div>
+  <div id="adminApp" class="hidden">
+  <h1>Usine à concepts</h1>
+  <div class="sub">Écosystème interne Creatikk · <span id="diag" class="muted">…</span></div>
+
+  <div class="tabs">
+    <button id="tabA">🔎 Analyser</button>
+    <button id="tabT" class="ghost">🧠 Templates</button>
+    <button id="tabG" class="ghost">✨ Générer</button>
+    <button id="tabS" class="ghost">🎁 Assets</button>
+  </div>
+
+  <!-- ANALYSER -->
+  <section id="paneA">
+    <div class="card">
+      <label>Lien TikTok (toute langue)</label>
+      <input id="url" placeholder="https://www.tiktok.com/@.../video/..." />
+      <div style="height:10px"></div>
+      <label>Transcription (optionnel — auto si Groq est branché)</label>
+      <textarea id="transcript" placeholder="Laisse vide : l'outil transcrit. Ou colle le script en secours."></textarea>
+      <div style="height:12px"></div>
+      <button id="goA">Analyser</button>
+      <div id="errA" class="err" style="margin-top:10px"></div>
+    </div>
+    <div id="resA"></div>
+  </section>
+
+  <!-- TEMPLATES -->
+  <section id="paneT" class="hidden">
+    <div class="card"><label>Filtrer par niche</label><input id="tFilter" placeholder="ex : fitness, business… (vide = tout)" /></div>
+    <div id="resT"></div>
+  </section>
+
+  <!-- GÉNÉRER -->
+  <section id="paneG" class="hidden">
+    <div class="card">
+      <div id="gCtx"></div>
+      <div class="row">
+        <div><label>Niche</label><input id="niche" placeholder="fitness masculin, business, dev perso…" /></div>
+        <div style="max-width:100px; flex:0 0 100px"><label>Combien</label><input id="n" type="number" value="5" min="1" max="10" /></div>
+      </div>
+      <div style="height:12px"></div>
+      <button id="goG">Générer</button>
+      <div class="muted" style="margin-top:8px" id="gInfo"></div>
+      <div id="errG" class="err" style="margin-top:10px"></div>
+    </div>
+    <div id="resG"></div>
+  </section>
+
+  <!-- ASSETS -->
+  <section id="paneS" class="hidden">
+    <div class="card">
+      <div class="assethint">Ces visuels apparaîtront dans <b>chaque concept côté créateur</b> (section « Éléments à utiliser »), prêts à télécharger et intégrer.</div>
+      <label>Ajouter un asset (image ou vidéo, max 25 Mo)</label>
+      <input id="aFile" type="file" accept="image/*,video/*" />
+      <div class="row" style="margin-top:10px">
+        <div><label>Nom</label><input id="aNom" placeholder="ex : Chargement Creatikk" /></div>
+        <div><label>Catégorie</label><select id="aCat"><option>Chargement Creatikk</option><option>Analytics TikTok</option><option>Interface / Overlay</option><option>Autre</option></select></div>
+      </div>
+      <div style="height:12px"></div>
+      <button id="aUp">Uploader</button>
+      <div id="aErr" class="err" style="margin-top:8px"></div>
+    </div>
+    <div id="resS"></div>
+  </section>
+  </div>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (t) => (t == null ? '' : String(t).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])));
+let SELTPL = null; // template choisi pour la génération
+
+function showTab(w) {
+  health();
+  for (const k of ['A', 'T', 'G', 'S']) { $('#pane' + k).classList.toggle('hidden', k !== w); $('#tab' + k).classList.toggle('ghost', k !== w); }
+  if (w === 'T') loadTemplates();
+  if (w === 'S') loadAssets();
+}
+$('#tabA').onclick = () => showTab('A');
+$('#tabT').onclick = () => showTab('T');
+$('#tabG').onclick = () => { renderGctx(); showTab('G'); };
+$('#tabS').onclick = () => showTab('S');
+// ── ASSETS (admin) ──
+function assetPreview(a) {
+  return (a.mime || '').startsWith('video')
+    ? `<video src="/assets/${a.file}" style="width:100%; border-radius:8px" muted playsinline></video>`
+    : `<img src="/assets/${a.file}" style="width:100%; border-radius:8px" />`;
+}
+async function loadAssets() {
+  $('#resS').innerHTML = '<div class="card muted">Chargement…</div>';
+  try {
+    const list = await (await fetch('/assets')).json();
+    if (!list.length) { $('#resS').innerHTML = '<div class="card muted">Aucun asset. Uploade tes visuels (chargements Creatikk, captures analytics…).</div>'; return; }
+    $('#resS').innerHTML = '<div class="agrid">' + list.map((a) => `<div class="atile">${assetPreview(a)}
+      <div class="rowline" style="margin-top:6px"><b style="flex:1; font-size:13px">${esc(a.nom)}</b></div>
+      <div class="muted" style="font-size:12px">${esc(a.category)}</div>
+      <div style="margin-top:6px"><a class="pill" href="/assets/${a.file}" download>⬇️ télécharger</a> <button class="ghost mini" onclick="_delAsset('${a.id}')">🗑️</button></div>
+    </div>`).join('') + '</div>';
+  } catch (e) { $('#resS').innerHTML = '<div class="err">' + e.message + '</div>'; }
+}
+$('#aUp').onclick = () => {
+  const file = $('#aFile').files[0]; $('#aErr').textContent = '';
+  if (!file) { $('#aErr').textContent = 'Choisis un fichier.'; return; }
+  const r = new FileReader();
+  $('#aUp').disabled = true; $('#aUp').innerHTML = '<span class="spin"></span> Upload…';
+  r.onload = async () => {
+    try {
+      const res = await (await fetch('/asset-upload', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ nom: $('#aNom').value || file.name, category: $('#aCat').value, dataUrl: r.result }) })).json();
+      if (res.error) throw new Error(res.error);
+      $('#aFile').value = ''; $('#aNom').value = ''; loadAssets();
+    } catch (e) { $('#aErr').textContent = e.message; }
+    $('#aUp').disabled = false; $('#aUp').textContent = 'Uploader';
+  };
+  r.readAsDataURL(file);
+};
+window._delAsset = async (id) => {
+  if (!confirm('Supprimer cet asset ?')) return;
+  await fetch('/asset-delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }) });
+  loadAssets();
+};
+
+async function health() {
+  try {
+    const h = await (await fetch('/health')).json();
+    $('#diag').textContent = `Claude ${h.anthropic ? '✅' : '❌'} · transcription ${h.groq ? '✅' : '⚠️ manuelle'} · ${h.templates} templates · ${h.sources} sources · ${h.concepts} concepts`;
+  } catch { $('#diag').textContent = 'serveur injoignable'; }
+}
+health();
+
+function copyKit(c) {
+  const p = [`🎬 ${c.titre}`, `🎣 HOOK : ${c.hook}`];
+  if (c.astuceGratuite) p.push(`🎁 ASTUCE GRATUITE (à donner AVANT Creatikk) : ${c.astuceGratuite}`);
+  p.push(`\n📝 SCRIPT (mot pour mot) :\n${c.scriptVerbatim || c.script || ''}`);
+  if (c.notesTournage) p.push(`\n🎥 NOTES DE TOURNAGE :\n${c.notesTournage}`);
+  p.push(`\n🎥 FORMAT : ${c.format}`);
+  const txt = p.join('\n');
+  navigator.clipboard.writeText(txt).then(() => alert('Kit copié — prêt à envoyer à ton créateur.'), () => {
+    const t = document.createElement('textarea'); t.value = txt; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); alert('Kit copié.');
+  });
+}
+window._copy = (id) => { const c = LASTCONCEPTS[id]; if (c) copyKit(c); };
+let LASTCONCEPTS = {};
+function conceptCard(c, key) {
+  LASTCONCEPTS[key] = c;
+  return `<div class="concept"><h4>${esc(c.titre)}</h4>
+    <div class="hook">🎣 ${esc(c.hook)}</div>
+    ${c.astuceGratuite ? `<div class="gift">🎁 Astuce gratuite (avant de parler de Creatikk) : ${esc(c.astuceGratuite)}</div>` : ''}
+    <div class="scriptlbl">📝 Script mot pour mot</div>
+    <div class="script">${esc(c.scriptVerbatim || c.script || '')}</div>
+    ${c.notesTournage ? `<details><summary>🎥 Notes de tournage</summary><div class="muted" style="white-space:pre-wrap; margin-top:6px">${esc(c.notesTournage)}</div></details>` : ''}
+    <div class="rowline" style="margin-top:9px"><span class="pill">${esc(c.format)}</span>${c.templateNom ? '<span class="pill">📐 ' + esc(c.templateNom) + '</span>' : ''}
+      <button class="ghost mini" onclick="_copy('${key}')">📋 Copier le kit</button></div>
+    ${c.pourquoiCaMarche ? `<div class="muted" style="margin-top:7px">💡 ${esc(c.pourquoiCaMarche)}</div>` : ''}</div>`;
+}
+
+// ── ANALYSER ──
+function renderAnalysis(d) {
+  const a = d.analysis, m = d.source.meta, v = a.viralite || {};
+  const banner = d.merged
+    ? `<div class="banner merge">✓ Renforce un template connu : <b>${esc(d.template.nom)}</b> — force ${d.template.force}</div>`
+    : `<div class="banner new">✨ Nouveau template créé : <b>${esc(d.template.nom)}</b></div>`;
+  let html = '<div class="card">' + banner + `
+    <div class="row" style="align-items:center">
+      <div style="flex:0 0 auto"><div class="score">${v.score ?? '?'}</div><div class="muted">/100 · ${esc(v.verdict)}</div></div>
+      <div style="flex:1; min-width:200px"><b>${esc(a.sujet)}</b><div class="muted">@${esc(m.author)} · ${m.views ?? '?'} vues · ${esc(a.langueSource)} · transcription ${d.diag.transcript ? '✅' : '⚠️'} · ${d.diag.frames} images${m.cuts != null ? ' · ' + m.cuts + ' coupes' : ''}</div></div>
+    </div>
+    <div style="margin-top:10px">${esc(v.pourquoi)}</div>
+    <div class="tmpl"><b class="muted">🔑 TEMPLATE</b> ${esc(a.templateReutilisable)}</div>
+    ${(a.scriptSource && a.scriptSource.length) ? `<div class="scriptlbl">🎬 Script de la vidéo source (dit / vu)</div><div class="script">${a.scriptSource.map((s) => `<div style="margin-bottom:9px"><b style="color:var(--blue)">${esc(s.moment)}</b><br>🗣️ ${esc(s.dit)}<br><span class="muted">👁️ ${esc(s.vu)}</span></div>`).join('')}</div>` : ''}
+    <details><summary>Voir l'analyse détaillée (hook, visuel, son, mécanisme…)</summary>
+      <div class="grid2" style="margin-top:10px">
+        <div class="kv"><b>Hook</b>${esc(a.hook)}</div><div class="kv"><b>Angle</b>${esc(a.angle)}</div>
+        <div class="kv"><b>Mécanisme psy</b>${esc(a.mecanismePsy)}</div><div class="kv"><b>Structure</b>${esc(a.structure)}</div>
+        <div class="kv"><b>Visuel</b>${esc(a.visuel)}</div><div class="kv"><b>Son</b>${esc(a.son)}</div>
+        <div class="kv"><b>Intégration produit</b>${esc(a.integrationProduit)}</div><div class="kv"><b>Format · CTA</b>${esc(a.format)} · ${esc(a.cta)}</div>
+      </div>
+    </details>
+    <h3 style="margin:16px 0 8px; font-size:16px">Adaptations Creatikk (ajoutées à « Mes concepts »)</h3>`;
+  (a.adaptationsCreatikk || []).forEach((c, i) => (html += conceptCard(c, 'a' + i)));
+  return html + '</div>';
+}
+$('#goA').onclick = async () => {
+  const url = $('#url').value.trim(); $('#errA').textContent = '';
+  if (!url) { $('#errA').textContent = 'Colle un lien.'; return; }
+  $('#goA').disabled = true; $('#goA').innerHTML = '<span class="spin"></span> Analyse…';
+  $('#resA').innerHTML = '<div class="card muted">Téléchargement → transcription → 12 images → analyse → rangement dans un template… (~1 à 1,5 min)</div>';
+  try {
+    const r = await (await fetch('/analyze', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url, transcript: $('#transcript').value }) })).json();
+    if (r.error) throw new Error(r.error);
+    $('#resA').innerHTML = renderAnalysis(r); health();
+  } catch (e) { $('#resA').innerHTML = ''; $('#errA').textContent = e.message; }
+  $('#goA').disabled = false; $('#goA').textContent = 'Analyser';
+};
+
+// ── TEMPLATES ──
+let TDATA = { templates: [], sources: [], concepts: [] };
+const fmtN = (n) => (n == null ? '?' : Number(n).toLocaleString('fr-FR'));
+const dollars = (v) => fmtN(Math.round((v || 0) / 1000)) + ' $';
+$('#tFilter').oninput = () => renderTemplateList();
+async function loadTemplates() {
+  $('#resT').innerHTML = '<div class="card muted">Chargement…</div>';
+  try {
+    const [t, s, c, a] = await Promise.all(['/templates', '/sources', '/concepts', '/assets'].map((u) => fetch(u).then((r) => r.json())));
+    TDATA = { templates: t, sources: s, concepts: c, assets: a };
+    renderTemplateList();
+  } catch (e) { $('#resT').innerHTML = '<div class="err">' + e.message + '</div>'; }
+}
+function tplStats(id) {
+  const srcs = TDATA.sources.filter((s) => s.templateId === id);
+  const views = srcs.reduce((a, s) => a + (s.meta?.views || 0), 0);
+  return { srcs, views };
+}
+function renderTemplateList() {
+  let t = TDATA.templates;
+  const f = $('#tFilter').value.trim().toLowerCase();
+  if (f) t = t.filter((x) => (x.niches || []).join(' ').toLowerCase().includes(f) || (x.nom || '').toLowerCase().includes(f));
+  if (!t.length) { $('#resT').innerHTML = '<div class="card muted">Aucun concept. Analyse des vidéos pour en créer.</div>'; return; }
+  $('#resT').innerHTML = t.map((x) => {
+    const st = tplStats(x.id);
+    return `<div class="card tcard">
+      <div class="rowline"><b style="flex:1; font-size:16px">${esc(x.nom)}</b><span class="pill force">force ${x.force}</span>${x.winner ? '<span class="pill win">🏆</span>' : ''}</div>
+      <div class="tmpl">${esc(x.formule)}</div>
+      <div class="rowline" style="margin-top:8px"><span class="pill">${st.srcs.length} vidéo(s)</span><span class="pill">${fmtN(st.views)} vues cumulées</span><span class="pill win">💰 ${dollars(st.views)} à 1$/1000</span></div>
+      <div style="margin-top:10px"><button class="mini" onclick="_open('${x.id}')">📂 Ouvrir le dossier</button>
+        <button class="ghost mini" onclick="_gen('${x.id}','${esc((x.niches || [])[0] || '').replace(/'/g, '')}','${esc(x.nom).replace(/'/g, '')}')">✨ Générer</button></div>
+    </div>`;
+  }).join('');
+}
+window._open = (id) => renderConceptDetail(id);
+function renderConceptDetail(id) {
+  const x = TDATA.templates.find((t) => t.id === id); if (!x) return;
+  const st = tplStats(id);
+  const concepts = TDATA.concepts.filter((c) => c.templateId === id);
+  const f = x.fiche;
+  const ficheHtml = f
+    ? `<div class="kv"><b>Pourquoi ça marche</b>${esc(f.logique)}</div>
+       <div class="scriptlbl">🎥 À montrer</div><ul class="ul">${(f.elementsAMontrer || []).map((e) => '<li>' + esc(e) + '</li>').join('')}</ul>
+       <div class="scriptlbl">🗣️ Quoi dire</div><ul class="ul">${(f.quoiDire || []).map((e) => '<li>' + esc(e) + '</li>').join('')}</ul>
+       <div class="scriptlbl">🚫 À éviter</div><ul class="ul">${(f.aEviter || []).map((e) => '<li>' + esc(e) + '</li>').join('')}</ul>`
+    : `<div class="muted">Pas encore de fiche. <button class="mini" id="sheetBtn" onclick="_sheet('${id}')">✨ Générer la fiche « comment le reproduire »</button></div>`;
+  const exHtml = st.srcs.length
+    ? st.srcs.map((s) => `<div class="rowline" style="margin:6px 0"><a href="${esc(s.url)}" target="_blank" style="flex:1; min-width:160px">${esc(s.sujet || s.url)}</a><span class="pill">${fmtN(s.meta?.views)} vues</span><span class="pill win">${dollars(s.meta?.views)}</span></div>`).join('')
+    : '<div class="muted">Aucune vidéo encore.</div>';
+  $('#resT').innerHTML = `<div class="card">
+    <button class="ghost mini" onclick="renderTemplateList()">← retour</button>
+    <div class="rowline" style="margin-top:10px"><b style="flex:1; font-size:19px">${esc(x.nom)}</b><span class="pill force">force ${x.force}</span>${x.winner ? '<span class="pill win">🏆 winner</span>' : ''}</div>
+    <div class="tmpl">${esc(x.formule)}</div>
+    <div class="rowline"><span class="pill">${st.srcs.length} vidéo(s)</span><span class="pill">${fmtN(st.views)} vues cumulées</span><span class="pill win">💰 ${dollars(st.views)} à 1$/1000 vues</span></div>
+    <button class="mini" style="margin-top:11px" onclick="_copyDossier('${id}')">📋 Copier le dossier (à envoyer à un créateur)</button>
+    <h3 style="margin:18px 0 6px; font-size:16px">📋 Fiche — comment le reproduire</h3>
+    ${ficheHtml}
+    <h3 style="margin:18px 0 6px; font-size:16px">🎥 Les vidéos de ce concept</h3>
+    ${exHtml}
+    ${concepts.length ? '<h3 style="margin:18px 0 6px; font-size:16px">✍️ Concepts prêts à filmer</h3>' + concepts.map((c, i) => conceptCard(c, 'd' + i)).join('') : ''}
+  </div>`;
+}
+window._sheet = async (id) => {
+  const b = $('#sheetBtn'); if (b) { b.disabled = true; b.innerHTML = '<span class="spin"></span> Génération…'; }
+  try {
+    const r = await (await fetch('/concept-sheet', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }) })).json();
+    if (r.error) throw new Error(r.error);
+    const t = TDATA.templates.find((x) => x.id === id); if (t) t.fiche = r.fiche;
+    renderConceptDetail(id);
+  } catch (e) { alert(e.message); if (b) { b.disabled = false; b.textContent = '✨ Générer la fiche'; } }
+};
+window._copyDossier = (id) => {
+  const x = TDATA.templates.find((t) => t.id === id); const st = tplStats(id); const f = x.fiche;
+  const L = [`📂 CONCEPT : ${x.nom}`, `\n🔑 FORMULE : ${x.formule}`, `\n💰 PREUVE : ${fmtN(st.views)} vues cumulées = ${dollars(st.views)} à 1$/1000 vues`];
+  if (f) {
+    L.push(`\n🧠 POURQUOI ÇA MARCHE :\n${f.logique}`);
+    L.push(`\n🎥 À MONTRER :\n- ${(f.elementsAMontrer || []).join('\n- ')}`);
+    L.push(`\n🗣️ QUOI DIRE :\n- ${(f.quoiDire || []).join('\n- ')}`);
+    L.push(`\n🚫 À ÉVITER :\n- ${(f.aEviter || []).join('\n- ')}`);
+  }
+  L.push(`\n🎬 EXEMPLES QUI ONT CARTONNÉ :\n${st.srcs.map((s) => `- ${s.url} (${fmtN(s.meta?.views)} vues)`).join('\n')}`);
+  const txt = L.join('\n');
+  navigator.clipboard.writeText(txt).then(() => alert('Dossier copié — prêt à envoyer.'), () => { const e = document.createElement('textarea'); e.value = txt; document.body.appendChild(e); e.select(); document.execCommand('copy'); e.remove(); alert('Dossier copié.'); });
+};
+window._gen = (id, niche, nom) => { SELTPL = { id, nom }; if (niche) $('#niche').value = niche; renderGctx(); showTab('G'); };
+function renderGctx() {
+  $('#gCtx').innerHTML = SELTPL
+    ? `<div class="banner merge">Basé sur le template <b>${esc(SELTPL.nom)}</b> <button class="ghost mini" onclick="SELTPL=null;renderGctx()" style="margin-left:8px">✕ tout utiliser</button></div>`
+    : '<div class="muted" style="margin-bottom:10px">Génère à partir de tous les templates (les plus forts en priorité).</div>';
+}
+
+// ── GÉNÉRER ──
+$('#goG').onclick = async () => {
+  const niche = $('#niche').value.trim(); $('#errG').textContent = '';
+  if (!niche) { $('#errG').textContent = 'Indique une niche.'; return; }
+  $('#goG').disabled = true; $('#goG').innerHTML = '<span class="spin"></span> Génération…'; $('#resG').innerHTML = '';
+  try {
+    const body = { niche, n: $('#n').value }; if (SELTPL) body.templateId = SELTPL.id;
+    const r = await (await fetch('/generate', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).json();
+    if (r.error) throw new Error(r.error);
+    $('#gInfo').textContent = (r.concepts || []).length + ' concept(s) ajouté(s) à « Mes concepts ».';
+    $('#resG').innerHTML = '<div class="card">' + (r.concepts || []).map((c, i) => conceptCard(c, 'g' + i)).join('') + '</div>';
+    health();
+  } catch (e) { $('#errG').textContent = e.message; }
+  $('#goG').disabled = false; $('#goG').textContent = 'Générer';
+};
+
+
+// ═══════════ ESPACE CRÉATEUR (lien ouvert, sans admin) ═══════════
+async function loadDataC() {
+  const [t, s, c, a] = await Promise.all(['/templates', '/sources', '/concepts', '/assets'].map((u) => fetch(u).then((r) => r.json())));
+  TDATA = { templates: t, sources: s, concepts: c, assets: a };
+}
+function bestVid(id) {
+  const s = TDATA.sources.filter((x) => x.templateId === id);
+  if (!s.length) return null;
+  return s.reduce((a, b) => ((b.meta && b.meta.views) || 0) > ((a.meta && a.meta.views) || 0) ? b : a);
+}
+const HERO_HTML = `<div class="hero">
+  <div class="badge">Programme créateurs · Creatikk</div>
+  <h1 class="heroTitle">Sois payé <span>1 $ / 1000 vues</span></h1>
+  <p class="heroSub">Choisis un concept déjà prouvé, filme-le en suivant la fiche, poste sur ton compte, encaisse. On te mâche tout le travail.</p>
+  <div class="steps">
+    <div class="step"><b>1. Choisis</b>un concept qui cartonne</div>
+    <div class="step"><b>2. Filme</b>avec la fiche : quoi montrer, quoi dire</div>
+    <div class="step"><b>3. Encaisse</b>1 $ pour 1000 vues</div>
+  </div>
+  <div class="promesse">
+    <div class="pline">✅ Pas besoin de 10 000 abonnés — même un compte tout neuf</div>
+    <div class="pline">✅ Aucune vue inéligible — toutes tes vues comptent</div>
+    <div class="pline">✅ Pas de paliers ni de récompenses à débloquer</div>
+    <div class="pline">✅ Payé automatiquement — 1 $ pour 1000 vues</div>
+    <div class="ppunch">Tu fais des vues, tu es payé. Point.</div>
+  </div>
+  <div style="margin-top:16px"><button onclick="document.getElementById('cCat').scrollIntoView({behavior:'smooth'})">Voir les concepts →</button></div>
+</div>`;
+function CNAV(active) {
+  return `<div class="cnav">
+    <button class="${active === 'concepts' ? '' : 'ghost'}" onclick="initCreator()">🎬 Concepts</button>
+    <button class="${active === 'res' ? '' : 'ghost'}" onclick="renderResources()">🎁 Ressources</button>
+  </div>`;
+}
+function assetsLibraryHtml() {
+  const list = TDATA.assets || [];
+  if (!list.length) return '<div class="card muted">Aucune ressource pour l\'instant. Elles apparaîtront ici dès qu\'elles sont ajoutées.</div>';
+  const cats = [...new Set(list.map((a) => a.category || 'Autre'))];
+  return cats.map((cat) => `<h3 style="margin:16px 0 6px; font-size:16px">${esc(cat)}</h3><div class="agrid">` + list.filter((a) => (a.category || 'Autre') === cat).map((a) => `<div class="atile">${assetPreview(a)}<div class="muted" style="font-size:12px; margin-top:5px">${esc(a.nom)}</div><a class="pill" href="/assets/${a.file}" download>⬇️ télécharger</a></div>`).join('') + '</div>').join('');
+}
+function renderResources() {
+  document.getElementById('creatorApp').innerHTML = CNAV('res') + `<div class="card">
+    <h2 style="margin:4px 0; font-size:20px">🎁 Ressources à utiliser</h2>
+    <p class="muted">Tous les éléments visuels prêts à glisser dans tes vidéos (chargements Creatikk, captures analytics TikTok…). Télécharge et intègre au bon moment.</p>
+  </div>` + assetsLibraryHtml();
+  window.scrollTo(0, 0);
+}
+async function initCreator() {
+  document.getElementById('creatorApp').innerHTML = CNAV('concepts') + HERO_HTML + '<h2 style="margin:24px 0 10px; font-size:19px">Les concepts prêts à filmer</h2><div id="cCat"><div class="card muted">Chargement…</div></div>';
+  if (!TDATA.templates.length) { try { await loadDataC(); } catch {} }
+  renderCatalogue();
+}
+function renderCatalogue() {
+  const el = document.getElementById('cCat'); if (!el) return;
+  if (!TDATA.templates.length) { el.innerHTML = '<div class="card muted">Concepts bientôt disponibles.</div>'; return; }
+  el.innerHTML = TDATA.templates.map((x) => {
+    const bv = bestVid(x.id);
+    return `<div class="card">
+      <div class="rowline"><b style="flex:1; font-size:17px">${esc(x.nom)}</b>${x.winner ? '<span class="pill win">🏆 winner</span>' : ''}</div>
+      <div class="muted" style="margin-top:4px">${esc(x.formule)}</div>
+      ${bv ? `<div class="gain">💰 Meilleure vidéo : ${fmtN(bv.meta.views)} vues = ${dollars(bv.meta.views)}</div>` : ''}
+      <button class="mini" style="margin-top:8px" onclick="_openC('${x.id}')">Voir le concept →</button>
+    </div>`;
+  }).join('');
+}
+function ficheCreator(f) {
+  return `<div class="kv"><b>Pourquoi ça marche</b>${esc(f.logique)}</div>
+    <div class="scriptlbl">🎥 À montrer</div><ul class="ul">${(f.elementsAMontrer || []).map((e) => '<li>' + esc(e) + '</li>').join('')}</ul>
+    <div class="scriptlbl">🗣️ Quoi dire</div><ul class="ul">${(f.quoiDire || []).map((e) => '<li>' + esc(e) + '</li>').join('')}</ul>
+    <div class="scriptlbl">🚫 À éviter</div><ul class="ul">${(f.aEviter || []).map((e) => '<li>' + esc(e) + '</li>').join('')}</ul>`;
+}
+window._openC = (id) => {
+  const x = TDATA.templates.find((t) => t.id === id); if (!x) return;
+  const bv = bestVid(id), f = x.fiche;
+  const concepts = TDATA.concepts.filter((c) => c.templateId === id);
+  const srcs = TDATA.sources.filter((s) => s.templateId === id);
+  document.getElementById('creatorApp').innerHTML = `<button class="ghost mini" onclick="initCreator()">← retour aux concepts</button>
+    <div class="card" style="margin-top:12px">
+      <h2 style="margin:4px 0; font-size:22px">${esc(x.nom)}</h2>
+      ${bv ? `<div class="gain big">💰 La meilleure vidéo de ce concept a fait <b>${fmtN(bv.meta.views)} vues</b> = <b>${dollars(bv.meta.views)}</b> pour son créateur</div>` : ''}
+      <div class="simu">Toi, à 1 $/1000 vues : 100k = 100 $ · 500k = 500 $ · 1M = 1 000 $</div>
+      <h3 style="margin:18px 0 8px; font-size:16px">📋 Comment le faire</h3>
+      ${f ? ficheCreator(f) : '<div class="muted">Fiche détaillée bientôt disponible.</div>'}
+      <div style="margin:14px 0"><button class="ghost mini" onclick="renderResources()">🎁 Voir les ressources à utiliser (chargements Creatikk…)</button></div>
+      <h3 style="margin:18px 0 8px; font-size:16px">🎬 Des vidéos qui ont cartonné avec ce concept</h3>
+      ${srcs.length ? srcs.map((s) => `<div class="rowline" style="margin:6px 0"><a href="${esc(s.url)}" target="_blank" style="flex:1; min-width:160px">${esc(s.sujet || s.url)}</a><span class="pill win">${fmtN(s.meta && s.meta.views)} vues</span></div>`).join('') : '<div class="muted">—</div>'}
+      ${concepts.length ? '<h3 style="margin:18px 0 8px; font-size:16px">✍️ Scripts prêts à filmer</h3>' + concepts.map((c, i) => conceptCard(c, 'cc' + i)).join('') : ''}
+    </div>`;
+  window.scrollTo(0, 0);
+};
+
+// ── Aiguillage : créateur par défaut, admin via ?admin ──
+const IS_ADMIN = new URLSearchParams(location.search).has('admin');
+if (IS_ADMIN) {
+  document.getElementById('adminApp').classList.remove('hidden');
+  document.getElementById('creatorApp').classList.add('hidden');
+  health();
+} else {
+  initCreator();
+}
+</script>
+</body>
+</html>

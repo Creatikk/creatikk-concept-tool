@@ -1,0 +1,24 @@
+# Blueprint Render — outil interne de concepts Creatikk.
+# Déploiement : Render → New → Blueprint → connecter ce dépôt.
+# Puis renseigner les 2 clés secrètes (ANTHROPIC_API_KEY, GROQ_API_KEY).
+services:
+  - type: web
+    name: creatikk-concept-tool
+    runtime: node
+    plan: starter            # payant (~7$/mois) — requis pour le disque persistant
+    buildCommand: npm install
+    startCommand: node server.js
+    autoDeploy: true
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false           # à saisir dans Render (secret)
+      - key: GROQ_API_KEY
+        sync: false           # à saisir dans Render (secret)
+      - key: ANTHROPIC_MODEL
+        value: claude-sonnet-4-6
+      - key: DATA_DIR
+        value: /var/data      # dossier monté sur le disque persistant
+    disk:
+      name: data
+      mountPath: /var/data
+      sizeGB: 1               # concepts (db.json) + assets uploadés

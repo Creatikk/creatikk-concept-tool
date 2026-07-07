@@ -1,0 +1,16 @@
+{
+  "name": "creatikk-concept-tool",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Outil interne Creatikk — colle un lien TikTok, analyse son+visuel+script, comprend la viralité, mémorise et génère de nouveaux concepts.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "ffmpeg-static": "^5.2.0"
+  }
+}
