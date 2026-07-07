@@ -130,19 +130,6 @@
 
   <!-- ASSETS -->
   <section id="paneS" class="hidden">
-    <!-- RESSOURCE CLÉ EN MAIN : le motion scan Creatikk sur SA vidéo -->
-    <div class="card" style="border:1px solid rgba(0,187,247,.4); background:linear-gradient(180deg, rgba(20,127,251,.08), rgba(148,14,251,.05))">
-      <div class="rowline" style="align-items:center; gap:8px"><span style="font-size:20px">🎬</span><b style="font-size:16px">Motion scan Creatikk sur ta vidéo</b></div>
-      <div class="assethint" style="margin-top:6px">Une ressource prête à l'emploi : <b>ajoute simplement ta vidéo</b> et on colle l'animation d'analyse Creatikk par-dessus. Tu récupères un MP4 à poster (l'effet « mon contenu passé au crible par l'IA »). Rien à monter.</div>
-      <label>Ta vidéo (mp4, mov ou webm — max 80 Mo)</label>
-      <input id="scanFile" type="file" accept="video/*" />
-      <div style="height:12px"></div>
-      <button id="scanGo">✨ Ajouter le scan à ma vidéo</button>
-      <div class="muted" style="margin-top:8px">Format 9:16 (TikTok/Reels) — la vidéo est recadrée automatiquement.</div>
-      <div id="scanErr" class="err" style="margin-top:8px"></div>
-      <div id="scanRes" style="margin-top:12px"></div>
-    </div>
-
     <div class="card">
       <div class="assethint">Ces visuels apparaîtront dans <b>chaque concept côté créateur</b> (section « Éléments à utiliser »), prêts à télécharger et intégrer.</div>
       <label>Ajouter un asset (image ou vidéo, max 25 Mo)</label>
@@ -214,24 +201,31 @@ window._delAsset = async (id) => {
   loadAssets();
 };
 
-// ── MOTION SCAN sur la vidéo du créateur ──
-$('#scanGo').onclick = () => {
-  const file = $('#scanFile').files[0]; $('#scanErr').textContent = ''; $('#scanRes').innerHTML = '';
-  if (!file) { $('#scanErr').textContent = 'Choisis une vidéo.'; return; }
-  if (file.size > 80 * 1024 * 1024) { $('#scanErr').textContent = 'Vidéo trop lourde (max 80 Mo).'; return; }
-  const r = new FileReader();
-  $('#scanGo').disabled = true; $('#scanGo').innerHTML = '<span class="spin"></span> Rendu du scan… (~20-40 s)';
-  r.onload = async () => {
-    try {
-      const res = await (await fetch('/scan-video', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ dataUrl: r.result }) })).json();
-      if (res.error) throw new Error(res.error);
-      $('#scanRes').innerHTML = `<video src="${res.url}" style="width:100%; max-width:280px; border-radius:12px; display:block" controls muted playsinline preload="metadata"></video>
-        <div style="margin-top:8px"><a class="pill" href="${res.url}" download>⬇️ Télécharger le MP4</a></div>
-        <div class="muted" style="font-size:12px; margin-top:4px">Prêt à poster (TikTok/Reels/Shorts).</div>`;
-    } catch (e) { $('#scanErr').textContent = e.message; }
-    $('#scanGo').disabled = false; $('#scanGo').textContent = '✨ Ajouter le scan à ma vidéo';
+// ── MOTION SCAN sur la vidéo du créateur (vue créateur, cf. openScanFlow) ──
+// Lie le bouton « Appliquer le scan » : envoie la vidéo à /scan-video, qui colle
+// l'overlay Creatikk par-dessus et renvoie un MP4 téléchargeable.
+window.bindScan = () => {
+  const btn = document.getElementById('scanGo'); if (!btn) return;
+  btn.onclick = () => {
+    const file = document.getElementById('scanFile').files[0];
+    const err = document.getElementById('scanErr'), out = document.getElementById('scanRes');
+    err.textContent = ''; out.innerHTML = '';
+    if (!file) { err.textContent = 'Choisis une vidéo.'; return; }
+    if (file.size > 80 * 1024 * 1024) { err.textContent = 'Vidéo trop lourde (max 80 Mo).'; return; }
+    const r = new FileReader();
+    btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Application du scan… (~20-40 s)';
+    r.onload = async () => {
+      try {
+        const res = await (await fetch('/scan-video', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ dataUrl: r.result }) })).json();
+        if (res.error) throw new Error(res.error);
+        out.innerHTML = `<video src="${res.url}" style="width:100%; max-width:280px; border-radius:12px; display:block" controls muted playsinline preload="metadata"></video>
+          <div style="margin-top:8px"><a class="pill" href="${res.url}" download>⬇️ Télécharger le MP4</a></div>
+          <div class="muted" style="font-size:12px; margin-top:4px">Prêt à poster (TikTok/Reels/Shorts).</div>`;
+      } catch (e) { err.textContent = e.message; }
+      btn.disabled = false; btn.textContent = '✨ Appliquer le scan';
+    };
+    r.readAsDataURL(file);
   };
-  r.readAsDataURL(file);
 };
 
 async function health() {
@@ -485,13 +479,46 @@ function assetsLibraryHtml() {
   const cats = [...new Set(list.map((a) => a.category || 'Autre'))];
   return cats.map((cat) => `<h3 style="margin:16px 0 6px; font-size:16px">${esc(cat)}</h3><div class="agrid">` + list.filter((a) => (a.category || 'Autre') === cat).map((a) => `<div class="atile">${assetPreview(a)}<div class="muted" style="font-size:12px; margin:5px 0">${esc(a.nom)}</div><a class="pill" href="/assets/${a.file}" target="_blank">👁️ voir</a> <a class="pill" href="/assets/${a.file}" download>⬇️ télécharger</a></div>`).join('') + '</div>').join('');
 }
+// Tuile « scan d'analyse » — s'affiche PARMI les ressources (aperçu animé de
+// l'overlay). Au clic → openScanFlow() (on n'télécharge PAS directement : on
+// demande d'abord la vidéo du créateur pour coller le scan par-dessus).
+function scanTileHtml() {
+  return `<h3 style="margin:16px 0 6px; font-size:16px">🎬 Animation d'analyse</h3><div class="agrid">
+    <div class="atile" style="cursor:pointer; border:1px solid rgba(0,187,247,.4)" onclick="openScanFlow()">
+      <div style="border-radius:8px; overflow:hidden; background:#05070f"><img src="/scanfx.apng" style="width:100%; display:block" alt="Scan d'analyse Creatikk" /></div>
+      <div class="muted" style="font-size:12px; margin:5px 0">Scan d'analyse IA — à coller sur TA vidéo</div>
+      <button class="pill" onclick="event.stopPropagation(); openScanFlow()">✨ Ajouter à ma vidéo</button>
+    </div>
+  </div>`;
+}
 function renderResources() {
   document.getElementById('creatorApp').innerHTML = CNAV('res') + `<div class="card">
     <h2 style="margin:4px 0; font-size:20px">🎁 Ressources à utiliser</h2>
     <p class="muted">Tous les éléments visuels prêts à glisser dans tes vidéos (chargements Creatikk, captures analytics TikTok…). Télécharge et intègre au bon moment.</p>
-  </div>` + assetsLibraryHtml();
+  </div>` + scanTileHtml() + assetsLibraryHtml();
   window.scrollTo(0, 0);
 }
+// Écran « ajoute ta vidéo » : on explique, on prend la vidéo, on applique le scan.
+window.openScanFlow = () => {
+  document.getElementById('creatorApp').innerHTML = `<button class="ghost mini" onclick="renderResources()">← retour aux ressources</button>
+    <div class="card" style="margin-top:12px">
+      <div class="rowline" style="gap:8px; align-items:center"><span style="font-size:22px">🎬</span><b style="font-size:19px">Scan d'analyse Creatikk sur ta vidéo</b></div>
+      <p class="muted" style="margin-top:6px">Ajoute ta vidéo : on colle l'animation d'analyse Creatikk par-dessus et tu récupères un MP4 prêt à poster (l'effet « mon contenu passé au crible par l'IA »). Rien à monter — format 9:16 recadré automatiquement.</p>
+      <div style="display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap; margin-top:12px">
+        <img src="/scanfx.apng" style="width:130px; border-radius:10px; background:#05070f; flex:none" alt="Aperçu du scan" />
+        <div style="flex:1; min-width:230px">
+          <label>Ta vidéo (mp4, mov ou webm — max 80 Mo)</label>
+          <input id="scanFile" type="file" accept="video/*" />
+          <div style="height:12px"></div>
+          <button id="scanGo">✨ Appliquer le scan</button>
+          <div id="scanErr" class="err" style="margin-top:8px"></div>
+        </div>
+      </div>
+      <div id="scanRes" style="margin-top:14px"></div>
+    </div>`;
+  bindScan();
+  window.scrollTo(0, 0);
+};
 async function initCreator() {
   document.getElementById('creatorApp').innerHTML = CNAV('concepts') + HERO_HTML + '<h2 style="margin:24px 0 10px; font-size:19px">Les concepts prêts à filmer</h2><div id="cCat"><div class="card muted">Chargement…</div></div>';
   if (!TDATA.templates.length) { try { await loadDataC(); } catch {} }

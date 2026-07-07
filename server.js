@@ -301,6 +301,14 @@ const server = http.createServer(async (req, res) => {
     if (u === '/asset-upload' && req.method === 'POST') return json(res, 200, await handleAssetUpload(await readBody(req)));
     if (u === '/asset-delete' && req.method === 'POST') return json(res, 200, await handleAssetDelete(await readBody(req)));
     if (u === '/scan-video' && req.method === 'POST') return json(res, 200, await handleScanVideo(await readBody(req)));
+    if (u === '/scanfx.apng' && (req.method === 'GET' || req.method === 'HEAD')) {
+      // Aperçu animé de l'overlay (tuile « Animation d'analyse » côté créateur).
+      if (!fs.existsSync(SCANFX)) return json(res, 404, { error: 'overlay absent' });
+      const stat = fs.statSync(SCANFX);
+      res.writeHead(200, { 'content-type': 'image/apng', 'cache-control': 'public, max-age=86400', 'content-length': stat.size });
+      if (req.method === 'HEAD') return res.end();
+      return fs.createReadStream(SCANFX).pipe(res);
+    }
     json(res, 404, { error: 'not found' });
   } catch (e) {
     console.error(req.url, '→', e.message);
