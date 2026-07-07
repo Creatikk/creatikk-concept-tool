@@ -130,6 +130,19 @@
 
   <!-- ASSETS -->
   <section id="paneS" class="hidden">
+    <!-- RESSOURCE CLÉ EN MAIN : le motion scan Creatikk sur SA vidéo -->
+    <div class="card" style="border:1px solid rgba(0,187,247,.4); background:linear-gradient(180deg, rgba(20,127,251,.08), rgba(148,14,251,.05))">
+      <div class="rowline" style="align-items:center; gap:8px"><span style="font-size:20px">🎬</span><b style="font-size:16px">Motion scan Creatikk sur ta vidéo</b></div>
+      <div class="assethint" style="margin-top:6px">Une ressource prête à l'emploi : <b>ajoute simplement ta vidéo</b> et on colle l'animation d'analyse Creatikk par-dessus. Tu récupères un MP4 à poster (l'effet « mon contenu passé au crible par l'IA »). Rien à monter.</div>
+      <label>Ta vidéo (mp4, mov ou webm — max 80 Mo)</label>
+      <input id="scanFile" type="file" accept="video/*" />
+      <div style="height:12px"></div>
+      <button id="scanGo">✨ Ajouter le scan à ma vidéo</button>
+      <div class="muted" style="margin-top:8px">Format 9:16 (TikTok/Reels) — la vidéo est recadrée automatiquement.</div>
+      <div id="scanErr" class="err" style="margin-top:8px"></div>
+      <div id="scanRes" style="margin-top:12px"></div>
+    </div>
+
     <div class="card">
       <div class="assethint">Ces visuels apparaîtront dans <b>chaque concept côté créateur</b> (section « Éléments à utiliser »), prêts à télécharger et intégrer.</div>
       <label>Ajouter un asset (image ou vidéo, max 25 Mo)</label>
@@ -199,6 +212,26 @@ window._delAsset = async (id) => {
   if (!confirm('Supprimer cet asset ?')) return;
   await fetch('/asset-delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }) });
   loadAssets();
+};
+
+// ── MOTION SCAN sur la vidéo du créateur ──
+$('#scanGo').onclick = () => {
+  const file = $('#scanFile').files[0]; $('#scanErr').textContent = ''; $('#scanRes').innerHTML = '';
+  if (!file) { $('#scanErr').textContent = 'Choisis une vidéo.'; return; }
+  if (file.size > 80 * 1024 * 1024) { $('#scanErr').textContent = 'Vidéo trop lourde (max 80 Mo).'; return; }
+  const r = new FileReader();
+  $('#scanGo').disabled = true; $('#scanGo').innerHTML = '<span class="spin"></span> Rendu du scan… (~20-40 s)';
+  r.onload = async () => {
+    try {
+      const res = await (await fetch('/scan-video', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ dataUrl: r.result }) })).json();
+      if (res.error) throw new Error(res.error);
+      $('#scanRes').innerHTML = `<video src="${res.url}" style="width:100%; max-width:280px; border-radius:12px; display:block" controls muted playsinline preload="metadata"></video>
+        <div style="margin-top:8px"><a class="pill" href="${res.url}" download>⬇️ Télécharger le MP4</a></div>
+        <div class="muted" style="font-size:12px; margin-top:4px">Prêt à poster (TikTok/Reels/Shorts).</div>`;
+    } catch (e) { $('#scanErr').textContent = e.message; }
+    $('#scanGo').disabled = false; $('#scanGo').textContent = '✨ Ajouter le scan à ma vidéo';
+  };
+  r.readAsDataURL(file);
 };
 
 async function health() {

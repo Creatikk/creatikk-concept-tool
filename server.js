@@ -7,6 +7,8 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
+const ffmpeg = require('ffmpeg-static');
 
 (function loadEnv() {
   const files = [path.join(__dirname, '.env'), path.join(__dirname, '..', 'creatikk_demo_server', '.env')];
@@ -207,6 +209,50 @@ async function handleAssetDelete(input) {
   return { ok: true };
 }
 
+// ── MOTION SCAN sur la vidéo du créateur ───────────────────────────
+// Ressource « clé en main » : le créateur envoie SA vidéo, ffmpeg colle
+// l'overlay de scan Creatikk (pré-rendu transparent, en boucle) par-dessus,
+// et renvoie un MP4 prêt à poster (lisible partout, iPhone compris).
+// L'overlay `assets_fx/scanfx.apng` (PNG animé transparent, boucle 2,4 s) est
+// pré-rendu une fois en local (Chrome n'existe pas sur le serveur Render) et
+// versionné avec le repo. APNG choisi car son alpha est lu de façon FIABLE par
+// ffmpeg (VP9/WebM perdait la transparence → fond noir).
+const SCANFX = path.join(__dirname, 'assets_fx', 'scanfx.apng');
+async function handleScanVideo(input) {
+  const m = /^data:([^;]+);base64,(.*)$/s.exec(input.dataUrl || '');
+  if (!m) throw new Error('Vidéo manquante ou invalide.');
+  if (!/^video\//.test(m[1])) throw new Error('Envoie une vidéo (mp4, mov ou webm).');
+  const buf = Buffer.from(m[2], 'base64');
+  if (buf.length > 80 * 1024 * 1024) throw new Error('Vidéo trop lourde (max 80 Mo).');
+  if (!fs.existsSync(SCANFX)) throw new Error("Overlay de scan absent (assets_fx/scanfx.webm) — relance le pré-rendu.");
+  fs.mkdirSync(TMP, { recursive: true });
+  fs.mkdirSync(ASSETS_DIR, { recursive: true });
+  const id = store.genId('scan');
+  const inPath = path.join(TMP, id + '_in.' + extFromMime(m[1]));
+  const outFile = id + '.mp4';
+  const outPath = path.join(ASSETS_DIR, outFile);
+  fs.writeFileSync(inPath, buf);
+  try {
+    // input 0 = overlay APNG bouclé (-ignore_loop 0) ; input 1 = vidéo créateur.
+    // 1) on cadre la vidéo en 9:16 plein cadre (cover + crop centré)
+    // 2) on superpose l'overlay, qui boucle jusqu'à la fin de la vidéo
+    //    (overlay=shortest=1), audio d'origine conservé.
+    execFileSync(ffmpeg, [
+      '-ignore_loop', '0', '-i', SCANFX,
+      '-i', inPath,
+      '-filter_complex',
+        '[1:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1[b];' +
+        '[0:v]scale=1080:1920[fx];[b][fx]overlay=shortest=1,format=yuv420p[v]',
+      '-map', '[v]', '-map', '1:a?',
+      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20',
+      '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', '-shortest',
+      '-y', outPath,
+    ], { stdio: 'ignore', maxBuffer: 1024 * 1024 * 64 });
+  } finally { try { fs.unlinkSync(inPath); } catch {} }
+  if (!fs.existsSync(outPath) || fs.statSync(outPath).size === 0) throw new Error('Le rendu vidéo a échoué.');
+  return { url: '/assets/' + outFile, file: outFile };
+}
+
 const server = http.createServer(async (req, res) => {
   try {
     const u = req.url.split('?')[0];
@@ -254,6 +300,7 @@ const server = http.createServer(async (req, res) => {
     if (u === '/assets' && req.method === 'GET') return json(res, 200, store.load().assets);
     if (u === '/asset-upload' && req.method === 'POST') return json(res, 200, await handleAssetUpload(await readBody(req)));
     if (u === '/asset-delete' && req.method === 'POST') return json(res, 200, await handleAssetDelete(await readBody(req)));
+    if (u === '/scan-video' && req.method === 'POST') return json(res, 200, await handleScanVideo(await readBody(req)));
     json(res, 404, { error: 'not found' });
   } catch (e) {
     console.error(req.url, '→', e.message);
