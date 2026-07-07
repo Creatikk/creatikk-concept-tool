@@ -255,6 +255,7 @@ function renderAnalysis(d) {
         <div class="kv"><b>Mécanisme psy</b>${esc(a.mecanismePsy)}</div><div class="kv"><b>Structure</b>${esc(a.structure)}</div>
         <div class="kv"><b>Visuel</b>${esc(a.visuel)}</div><div class="kv"><b>Son</b>${esc(a.son)}</div>
         <div class="kv"><b>Intégration produit</b>${esc(a.integrationProduit)}</div><div class="kv"><b>Format · CTA</b>${esc(a.format)} · ${esc(a.cta)}</div>
+        ${a.reactionsCommentaires ? `<div class="kv" style="grid-column:1/-1"><b>💬 Réactions (commentaires les + likés)</b>${esc(a.reactionsCommentaires)}</div>` : ''}
       </div>
     </details>
     <div class="banner merge" style="margin-top:16px">✍️ Les <b>scripts prêts à filmer</b> se génèrent en arrière-plan (~1 min). Tu les retrouves dans le concept : onglet <b>Templates → Ouvrir le dossier</b> (et côté créateur).</div>`;

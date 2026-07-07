@@ -60,7 +60,12 @@ async function handleAnalyze(input) {
     try { info.meta.cuts = countCuts(mp4); } catch {}
   } finally { try { fs.unlinkSync(mp4); } catch {} }
 
-  const analysis = await callClaude({ ...buildAnalyze({ meta: info.meta, transcript, framesB64 }), maxTokens: 4500 });
+  // Commentaires les plus likés (signal viral) — après le téléchargement, donc
+  // espacé de fetchInfo pour ne pas heurter la limite tikwm (1 req/s).
+  let comments = [];
+  try { comments = await tiktok.fetchComments(url); } catch (e) { console.error('comments →', e.message); }
+
+  const analysis = await callClaude({ ...buildAnalyze({ meta: info.meta, transcript, framesB64, comments }), maxTokens: 4500 });
 
   const db = store.load();
   // Fusion : ce concept correspond-il à un template connu ?
