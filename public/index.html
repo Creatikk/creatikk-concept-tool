@@ -88,6 +88,7 @@
     <button id="tabA">🔎 Analyser</button>
     <button id="tabT" class="ghost">🧠 Templates</button>
     <button id="tabG" class="ghost">✨ Générer</button>
+    <button id="tabM" class="ghost">💡 Inspiration</button>
     <button id="tabS" class="ghost">🎁 Assets</button>
   </div>
 
@@ -128,6 +129,26 @@
     <div id="resG"></div>
   </section>
 
+  <!-- MARKETPLACE (admin) -->
+  <section id="paneM" class="hidden">
+    <div class="card">
+      <div class="assethint">Balance des liens TikTok <b>en masse</b> : ils apparaissent dans l'<b>onglet Inspiration côté créateur</b> (mur de vidéos jouables, vues + argent). Rattache-les à un template pour afficher un bouton « Voir le concept ».</div>
+      <div class="row">
+        <div><label>Rattacher à un template (optionnel)</label><select id="mTpl"><option value="">— Aucun —</option></select></div>
+        <div><label>Catégorie (optionnel)</label><input id="mCat" placeholder="ex : fitness, business, dev perso…" /></div>
+      </div>
+      <div style="height:10px"></div>
+      <label>Liens TikTok — un par ligne</label>
+      <textarea id="mUrls" style="min-height:120px" placeholder="https://www.tiktok.com/@.../video/...&#10;https://www.tiktok.com/@.../video/..."></textarea>
+      <div style="height:12px"></div>
+      <button id="mAdd">Ajouter à l'inspiration</button>
+      <button id="mImport" class="ghost" style="margin-left:8px">📥 Importer mes vidéos analysées</button>
+      <span id="mInfo" class="muted" style="margin-left:10px"></span>
+      <div id="mErr" class="err" style="margin-top:8px"></div>
+    </div>
+    <div id="resM"></div>
+  </section>
+
   <!-- ASSETS -->
   <section id="paneS" class="hidden">
     <div class="card">
@@ -154,14 +175,76 @@ let SELTPL = null; // template choisi pour la génération
 
 function showTab(w) {
   health();
-  for (const k of ['A', 'T', 'G', 'S']) { $('#pane' + k).classList.toggle('hidden', k !== w); $('#tab' + k).classList.toggle('ghost', k !== w); }
+  for (const k of ['A', 'T', 'G', 'M', 'S']) { $('#pane' + k).classList.toggle('hidden', k !== w); $('#tab' + k).classList.toggle('ghost', k !== w); }
   if (w === 'T') loadTemplates();
+  if (w === 'M') loadMarket();
   if (w === 'S') loadAssets();
 }
 $('#tabA').onclick = () => showTab('A');
 $('#tabT').onclick = () => showTab('T');
 $('#tabG').onclick = () => { renderGctx(); showTab('G'); };
+$('#tabM').onclick = () => showTab('M');
 $('#tabS').onclick = () => showTab('S');
+
+// ── MARKETPLACE (admin : ajout en masse + suppression) ──
+let MDATA = { market: [], templates: [] };
+function tplNom(id) { const all = [...(MDATA.templates || []), ...((TDATA && TDATA.templates) || [])]; const t = all.find((x) => x && x.id === id); return t ? t.nom : null; }
+function marketTile(v, admin) {
+  const nom = tplNom(v.templateId);
+  const media = v.videoFile
+    ? `<video src="/assets/${v.videoFile}" ${v.coverFile ? `poster="/assets/${v.coverFile}"` : ''} style="width:100%; aspect-ratio:9/16; object-fit:cover; border-radius:8px; display:block; background:#05070f" controls muted playsinline preload="metadata"></video>`
+    : (v.coverFile
+        ? `<a href="${esc(v.url)}" target="_blank"><img src="/assets/${v.coverFile}" style="width:100%; aspect-ratio:9/16; object-fit:cover; border-radius:8px; display:block" /></a>`
+        : `<a href="${esc(v.url)}" target="_blank" class="muted" style="display:flex; aspect-ratio:9/16; align-items:center; justify-content:center; border:1px solid var(--line); border-radius:8px; text-decoration:none">▶︎ voir la vidéo</a>`);
+  return `<div class="atile">${media}
+    <div class="gain" style="margin:7px 0 5px; font-size:13px">💰 ${fmtN(v.views)} vues = ${dollars(v.views)}</div>
+    <div class="rowline" style="gap:5px">${v.author ? `<span class="muted" style="font-size:12px">@${esc(v.author)}</span>` : ''}</div>
+    <div class="rowline" style="gap:5px; margin-top:5px">${v.category ? `<span class="pill">${esc(v.category)}</span>` : ''}${nom ? `<span class="pill force">📐 ${esc(nom)}</span>` : ''}</div>
+    ${!admin && nom ? `<button class="mini" style="margin-top:7px" onclick="_openC('${v.templateId}')">Voir le concept →</button>` : ''}
+    ${admin ? `<div style="margin-top:7px"><a class="pill" href="${esc(v.url)}" target="_blank">🔗 ouvrir</a> <button class="ghost mini" onclick="_delMarket('${v.id}')">🗑️ retirer</button></div>` : ''}
+  </div>`;
+}
+async function loadMarket() {
+  $('#resM').innerHTML = '<div class="card muted">Chargement…</div>';
+  try {
+    const [m, t] = await Promise.all(['/market', '/templates'].map((u) => fetch(u).then((r) => r.json())));
+    MDATA = { market: m, templates: t };
+    $('#mTpl').innerHTML = '<option value="">— Aucun —</option>' + t.map((x) => `<option value="${x.id}">${esc(x.nom)}</option>`).join('');
+    if (!m.length) { $('#resM').innerHTML = '<div class="card muted">Aucune vidéo dans l\'inspiration. Colle des liens ci-dessus.</div>'; return; }
+    $('#resM').innerHTML = `<div class="muted" style="margin:4px 0 10px">${m.length} vidéo(s) dans l'inspiration</div><div class="agrid">` + m.map((v) => marketTile(v, true)).join('') + '</div>';
+  } catch (e) { $('#resM').innerHTML = '<div class="err">' + e.message + '</div>'; }
+}
+$('#mAdd').onclick = async () => {
+  const urls = $('#mUrls').value.trim(); $('#mErr').textContent = ''; $('#mInfo').textContent = '';
+  if (!urls) { $('#mErr').textContent = 'Colle au moins un lien.'; return; }
+  const nb = urls.split(/\s+/).filter(Boolean).length;
+  $('#mAdd').disabled = true; $('#mAdd').innerHTML = `<span class="spin"></span> Ajout de ${nb} lien(s)… (~4 s/vidéo)`;
+  try {
+    const r = await (await fetch('/market-add', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ urls, templateId: $('#mTpl').value, category: $('#mCat').value }) })).json();
+    if (r.error) throw new Error(r.error);
+    $('#mInfo').textContent = `✅ ${r.added.length} ajoutée(s)` + (r.failed.length ? ` · ⚠️ ${r.failed.length} échec(s)` : '');
+    $('#mUrls').value = '';
+    loadMarket();
+  } catch (e) { $('#mErr').textContent = e.message; }
+  $('#mAdd').disabled = false; $('#mAdd').textContent = 'Ajouter à l\'inspiration';
+};
+window._delMarket = async (id) => {
+  if (!confirm('Retirer cette vidéo de l\'inspiration ?')) return;
+  await fetch('/market-delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }) });
+  loadMarket();
+};
+$('#mImport').onclick = async () => {
+  if (!confirm('Importer toutes tes vidéos déjà analysées dans l\'inspiration ? (télécharge vignette + vidéo, ~5 s/vidéo)')) return;
+  $('#mErr').textContent = ''; $('#mInfo').textContent = '';
+  $('#mImport').disabled = true; $('#mImport').innerHTML = '<span class="spin"></span> Import…';
+  try {
+    const r = await (await fetch('/market-import-sources', { method: 'POST' })).json();
+    if (r.error) throw new Error(r.error);
+    $('#mInfo').textContent = `✅ ${r.added} importée(s)` + (r.skipped ? ` · ${r.skipped} déjà présente(s)` : '');
+    loadMarket();
+  } catch (e) { $('#mErr').textContent = e.message; }
+  $('#mImport').disabled = false; $('#mImport').textContent = '📥 Importer mes vidéos analysées';
+};
 // ── ASSETS (admin) ──
 function assetPreview(a) {
   return (a.mime || '').startsWith('video')
@@ -469,8 +552,40 @@ const HERO_HTML = `<div class="hero">
 function CNAV(active) {
   return `<div class="cnav">
     <button class="${active === 'concepts' ? '' : 'ghost'}" onclick="initCreator()">🎬 Concepts</button>
+    <button class="${active === 'market' ? '' : 'ghost'}" onclick="renderMarketplace()">💡 Inspiration</button>
     <button class="${active === 'res' ? '' : 'ghost'}" onclick="renderResources()">🎁 Ressources</button>
   </div>`;
+}
+// ── MARKETPLACE (créateur : mur d'inspiration) ──
+let MFILTER = null;
+async function renderMarketplace() {
+  const app = document.getElementById('creatorApp');
+  app.innerHTML = CNAV('market') + '<div class="card muted">Chargement…</div>';
+  window.scrollTo(0, 0);
+  try {
+    if (!TDATA.templates || !TDATA.templates.length) await loadDataC();
+    TDATA.market = await (await fetch('/market')).json();
+    MFILTER = null;
+    renderMarketplaceList();
+  } catch (e) { app.innerHTML = CNAV('market') + '<div class="err">' + esc(e.message) + '</div>'; }
+}
+window.setMFilter = (c) => { MFILTER = c; renderMarketplaceList(); };
+function renderMarketplaceList() {
+  const app = document.getElementById('creatorApp');
+  const list = TDATA.market || [];
+  const head = `<div class="card">
+    <h2 style="margin:4px 0; font-size:20px">💡 Inspiration — le mur des vidéos qui cartonnent</h2>
+    <p class="muted">Toutes les vidéos qui cartonnent, en vrac. Regarde-les, imprègne-toi, repère un style, puis clique « Voir le concept » pour la recette. Chaque vidéo montre ce qu'elle a rapporté à 1 $/1000 vues.</p>`;
+  if (!list.length) { app.innerHTML = CNAV('market') + head + '<p class="muted">Les vidéos d\'inspiration arrivent très vite ici.</p></div>'; return; }
+  const cats = [...new Set(list.map((v) => v.category).filter(Boolean))];
+  const chips = cats.length ? `<div class="rowline" style="margin-top:10px">
+    <button class="pill ${MFILTER ? '' : 'win'}" onclick="setMFilter(null)">Tout (${list.length})</button>
+    ${cats.map((c) => `<button class="pill ${MFILTER === c ? 'win' : ''}" onclick="setMFilter('${esc(c).replace(/'/g, '')}')">${esc(c)}</button>`).join('')}
+  </div>` : '';
+  const filtered = MFILTER ? list.filter((v) => v.category === MFILTER) : list;
+  const sorted = [...filtered].sort((a, b) => (b.views || 0) - (a.views || 0));
+  app.innerHTML = CNAV('market') + head + chips + '</div><div class="agrid">' + sorted.map((v) => marketTile(v, false)).join('') + '</div>';
+  window.scrollTo(0, 0);
 }
 function assetsLibraryHtml() {
   const list = TDATA.assets || [];

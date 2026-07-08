@@ -223,6 +223,88 @@ async function handleAssetDelete(input) {
   return { ok: true };
 }
 
+// ── Marketplace : mur de vidéos d'inspiration (liens ajoutés en masse) ─
+// On récupère juste vues + vignette (léger, pas d'analyse IA), et on
+// TÉLÉCHARGE la vignette (les URLs TikTok expirent en quelques heures).
+async function downloadCover(coverUrl, id) {
+  if (!coverUrl) return null;
+  try {
+    const cres = await fetch(coverUrl, { headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://www.tiktok.com/' } });
+    if (!cres.ok) return null;
+    const cbuf = Buffer.from(await cres.arrayBuffer());
+    fs.mkdirSync(ASSETS_DIR, { recursive: true });
+    const coverFile = id + '.jpg';
+    fs.writeFileSync(path.join(ASSETS_DIR, coverFile), cbuf);
+    return coverFile;
+  } catch { return null; }
+}
+// Télécharge la vidéo (mp4 sans watermark) pour la LIRE en ligne dans la carte
+// (service /assets déjà en Range/206 → lecture iOS OK). Garde-fou de taille.
+async function downloadVideo(videoUrl, id) {
+  if (!videoUrl) return null;
+  try {
+    fs.mkdirSync(ASSETS_DIR, { recursive: true });
+    const videoFile = id + '.mp4';
+    const fp = path.join(ASSETS_DIR, videoFile);
+    await tiktok.downloadTo(videoUrl, fp);
+    const sz = fs.statSync(fp).size;
+    if (!sz || sz > 80 * 1024 * 1024) { try { fs.unlinkSync(fp); } catch {} return null; }
+    return videoFile;
+  } catch { return null; }
+}
+async function handleMarketAdd(input) {
+  const raw = Array.isArray(input.urls) ? input.urls : String(input.urls || input.url || '').split(/[\s,]+/);
+  const urls = [...new Set(raw.map((u) => (u || '').trim()).filter((u) => /^https?:\/\//.test(u)))];
+  if (!urls.length) throw new Error('Aucun lien valide.');
+  const templateId = input.templateId || null;
+  const category = (input.category || '').trim() || null;
+  const db = store.load();
+  const added = [], failed = [];
+  for (const url of urls) {
+    if (db.market.find((m) => m.url === url)) { failed.push({ url, error: 'déjà présent' }); continue; }
+    try {
+      const info = await tiktok.fetchInfo(url);
+      const meta = info.meta;
+      const id = store.genId('mk');
+      const coverFile = await downloadCover(meta.cover, id);
+      const videoFile = await downloadVideo(info.videoUrl, id);
+      const item = { id, url, templateId, category, coverFile, videoFile, author: meta.author, views: meta.views, likes: meta.likes, duration: meta.duration, postDate: meta.postDate, addedAt: now() };
+      db.market.unshift(item); added.push(item);
+    } catch (e) { failed.push({ url, error: e.message }); }
+  }
+  store.save(db);
+  return { added, failed };
+}
+// Importe toutes les vidéos DÉJÀ analysées (sources) dans le marketplace,
+// en gardant leur template. Re-fetch pour une vignette fraîche (les URLs
+// stockées expirent) ; catégorie = 1ʳᵉ niche du template.
+async function handleMarketImportSources() {
+  const db = store.load();
+  let added = 0, skipped = 0;
+  for (const s of db.sources) {
+    if (!s.url || db.market.find((m) => m.url === s.url)) { skipped++; continue; }
+    const id = store.genId('mk');
+    const tpl = db.templates.find((t) => t.id === s.templateId);
+    const category = tpl && tpl.niches && tpl.niches[0] ? tpl.niches[0] : null;
+    let meta = s.meta || {}, coverFile = null, videoFile = null;
+    try { const info = await tiktok.fetchInfo(s.url); meta = { ...meta, ...info.meta }; coverFile = await downloadCover(info.meta.cover, id); videoFile = await downloadVideo(info.videoUrl, id); } catch {}
+    db.market.unshift({ id, url: s.url, templateId: s.templateId || null, category, coverFile, videoFile, author: meta.author || null, views: meta.views ?? null, likes: meta.likes ?? null, duration: meta.duration ?? null, postDate: meta.postDate || null, addedAt: now(), fromSource: true });
+    added++;
+  }
+  store.save(db);
+  return { added, skipped };
+}
+async function handleMarketDelete(input) {
+  const db = store.load();
+  const i = db.market.findIndex((m) => m.id === input.id);
+  if (i < 0) throw new Error('Vidéo introuvable.');
+  if (db.market[i].coverFile) { try { fs.unlinkSync(path.join(ASSETS_DIR, db.market[i].coverFile)); } catch {} }
+  if (db.market[i].videoFile) { try { fs.unlinkSync(path.join(ASSETS_DIR, db.market[i].videoFile)); } catch {} }
+  db.market.splice(i, 1);
+  store.save(db);
+  return { ok: true };
+}
+
 // ── MOTION SCAN sur la vidéo du créateur ───────────────────────────
 // Ressource « clé en main » : le créateur envoie SA vidéo, ffmpeg colle
 // l'overlay de scan Creatikk (pré-rendu transparent, en boucle) par-dessus,
@@ -332,6 +414,10 @@ const server = http.createServer(async (req, res) => {
     if (u === '/assets' && req.method === 'GET') return json(res, 200, store.load().assets);
     if (u === '/asset-upload' && req.method === 'POST') return json(res, 200, await handleAssetUpload(await readBody(req)));
     if (u === '/asset-delete' && req.method === 'POST') return json(res, 200, await handleAssetDelete(await readBody(req)));
+    if (u === '/market' && req.method === 'GET') return json(res, 200, store.load().market);
+    if (u === '/market-add' && req.method === 'POST') return json(res, 200, await handleMarketAdd(await readBody(req)));
+    if (u === '/market-import-sources' && req.method === 'POST') return json(res, 200, await handleMarketImportSources());
+    if (u === '/market-delete' && req.method === 'POST') return json(res, 200, await handleMarketDelete(await readBody(req)));
     if (u === '/scan-video' && req.method === 'POST') return json(res, 200, await handleScanVideo(req));
     if (u === '/scan-selftest' && req.method === 'GET') {
       // Diagnostic : compose le scan sur un clip GÉNÉRÉ (pas d'upload) → révèle
