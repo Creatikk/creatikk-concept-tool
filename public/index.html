@@ -241,8 +241,8 @@ $('#mImport').onclick = async () => {
     const r = await (await fetch('/market-import-sources', { method: 'POST' })).json();
     if (r.error) throw new Error(r.error);
     $('#mInfo').textContent = `✅ ${r.added} importée(s)` + (r.skipped ? ` · ${r.skipped} déjà présente(s)` : '');
-    loadMarket();
-  } catch (e) { $('#mErr').textContent = e.message; }
+  } catch (e) { $('#mErr').textContent = 'Import interrompu (' + e.message + ') — les vidéos déjà importées sont sauvées, reclique pour continuer.'; }
+  loadMarket();
   $('#mImport').disabled = false; $('#mImport').textContent = '📥 Importer mes vidéos analysées';
 };
 // ── ASSETS (admin) ──

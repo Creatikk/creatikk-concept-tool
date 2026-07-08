@@ -270,9 +270,9 @@ async function handleMarketAdd(input) {
       const videoFile = await downloadVideo(info.videoUrl, id);
       const item = { id, url, templateId, category, coverFile, videoFile, author: meta.author, views: meta.views, likes: meta.likes, duration: meta.duration, postDate: meta.postDate, addedAt: now() };
       db.market.unshift(item); added.push(item);
+      store.save(db); // sauvegarde à chaque vidéo (un crash ne perd pas les précédentes)
     } catch (e) { failed.push({ url, error: e.message }); }
   }
-  store.save(db);
   return { added, failed };
 }
 // Importe toutes les vidéos DÉJÀ analysées (sources) dans le marketplace,
@@ -290,8 +290,8 @@ async function handleMarketImportSources() {
     try { const info = await tiktok.fetchInfo(s.url); meta = { ...meta, ...info.meta }; coverFile = await downloadCover(info.meta.cover, id); videoFile = await downloadVideo(info.videoUrl, id); } catch {}
     db.market.unshift({ id, url: s.url, templateId: s.templateId || null, category, coverFile, videoFile, author: meta.author || null, views: meta.views ?? null, likes: meta.likes ?? null, duration: meta.duration ?? null, postDate: meta.postDate || null, addedAt: now(), fromSource: true });
     added++;
+    store.save(db); // sauvegarde à chaque vidéo → un crash/redémarrage ne perd rien
   }
-  store.save(db);
   return { added, skipped };
 }
 async function handleMarketDelete(input) {
