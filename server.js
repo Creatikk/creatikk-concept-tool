@@ -252,6 +252,17 @@ async function downloadVideo(videoUrl, id) {
     return videoFile;
   } catch { return null; }
 }
+// Clé unique d'une vidéo = son ID TikTok (robuste aux variantes d'URL) ;
+// à défaut, l'URL normalisée (sans query ni slash final). Sert à empêcher
+// TOUT doublon dans l'inspiration (même vidéo importée ET ajoutée à la main).
+function videoKey(url) {
+  if (!url) return '';
+  const m = /\/(?:video|photo|v)\/(\d+)/.exec(url);
+  if (m) return m[1];
+  return url.split('?')[0].replace(/\/+$/, '').toLowerCase();
+}
+const marketHasVideo = (db, url) => db.market.some((m) => videoKey(m.url) === videoKey(url));
+
 async function handleMarketAdd(input) {
   const raw = Array.isArray(input.urls) ? input.urls : String(input.urls || input.url || '').split(/[\s,]+/);
   const urls = [...new Set(raw.map((u) => (u || '').trim()).filter((u) => /^https?:\/\//.test(u)))];
@@ -261,7 +272,7 @@ async function handleMarketAdd(input) {
   const db = store.load();
   const added = [], failed = [];
   for (const url of urls) {
-    if (db.market.find((m) => m.url === url)) { failed.push({ url, error: 'déjà présent' }); continue; }
+    if (marketHasVideo(db, url)) { failed.push({ url, error: 'déjà présent' }); continue; }
     try {
       const info = await tiktok.fetchInfo(url);
       const meta = info.meta;
@@ -282,7 +293,7 @@ async function handleMarketImportSources() {
   const db = store.load();
   let added = 0, skipped = 0;
   for (const s of db.sources) {
-    if (!s.url || db.market.find((m) => m.url === s.url)) { skipped++; continue; }
+    if (!s.url || marketHasVideo(db, s.url)) { skipped++; continue; }
     const id = store.genId('mk');
     const tpl = db.templates.find((t) => t.id === s.templateId);
     const category = tpl && tpl.niches && tpl.niches[0] ? tpl.niches[0] : null;
