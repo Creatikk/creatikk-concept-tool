@@ -65,6 +65,7 @@
   .cnav button{ padding:8px 18px; }
   details{ margin-top:8px; } summary{ cursor:pointer; color:var(--mut); font-size:13px; user-select:none; }
   .tmpl{ border-left:3px solid var(--purple); padding-left:11px; margin:10px 0; font-size:14px; }
+  .clamp{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .banner{ border-radius:10px; padding:10px 13px; margin-bottom:12px; font-size:14px; }
   .banner.new{ background:rgba(148,14,251,.14); border:1px solid var(--purple); }
   .banner.merge{ background:rgba(20,127,251,.14); border:1px solid var(--blue); }
@@ -438,7 +439,7 @@ function renderTemplateList() {
     const st = tplStats(x.id);
     return `<div class="card tcard">
       <div class="rowline"><b style="flex:1; font-size:16px">${esc(x.nom)}</b>${x.id === top ? '<span class="pill win">🔥 cartonne le plus</span>' : ''}<span class="pill force">force ${x.force}</span></div>
-      <div class="tmpl">${esc(x.formule)}</div>
+      <div class="tmpl clamp">${esc(x.formule)}</div>
       <div class="rowline" style="margin-top:8px"><span class="pill">${st.nb} vidéo(s)</span><span class="pill">moy. ${fmtN(st.avg)} = ${dollars(st.avg)}</span><span class="pill win">max ${fmtN(st.best)} = ${dollars(st.best)}</span></div>
       <div style="margin-top:10px"><button class="mini" onclick="_open('${x.id}')">📂 Ouvrir le dossier</button>
         <button class="ghost mini" onclick="_gen('${x.id}','${esc((x.niches || [])[0] || '').replace(/'/g, '')}','${esc(x.nom).replace(/'/g, '')}')">✨ Générer</button></div>
@@ -647,7 +648,7 @@ function renderCatalogue() {
     const st = tplStats(x.id);
     return `<div class="card">
       <div class="rowline"><b style="flex:1; font-size:17px">${esc(x.nom)}</b>${x.id === top ? '<span class="pill win">🔥 cartonne le plus en ce moment</span>' : ''}</div>
-      <div class="muted" style="margin-top:4px">${esc(x.formule)}</div>
+      <div class="muted clamp" style="margin-top:4px">${esc(x.formule)}</div>
       ${st.nb ? `<div class="gain">💰 Meilleure : ${fmtN(st.best)} vues = ${dollars(st.best)} · Moyenne : ${fmtN(st.avg)} = ${dollars(st.avg)}</div>` : ''}
       <button class="mini" style="margin-top:8px" onclick="_openC('${x.id}')">Voir le concept →</button>
     </div>`;
