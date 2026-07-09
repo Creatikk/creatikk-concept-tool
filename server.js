@@ -323,6 +323,32 @@ async function handleMarketDelete(input) {
   return { ok: true };
 }
 
+// Re-synthèse d'un template EN TÂCHE DE FOND (après une fusion) : affine la
+// formule/les hooks sur toutes ses vidéos + régénère la fiche « comment faire ».
+function regenTemplate(tid) {
+  (async () => {
+    try {
+      const db = store.load();
+      const t = db.templates.find((x) => x.id === tid);
+      if (!t) return;
+      const srcs = db.sources.filter((s) => s.templateId === tid);
+      if (srcs.length >= 2) {
+        try {
+          const ref = await callClaude(buildRefineTemplate({ template: t, sources: srcs }));
+          if (ref.nom) t.nom = ref.nom;
+          if (ref.formule) t.formule = ref.formule;
+          if (ref.ressorts) t.ressorts = ref.ressorts;
+          if (ref.hookPatterns) t.hookPatterns = ref.hookPatterns;
+          if (ref.pourquoiCaMarche) t.pourquoiCaMarche = ref.pourquoiCaMarche;
+          if (ref.niches) t.niches = Array.from(new Set([...(t.niches || []), ...ref.niches]));
+        } catch (e) { console.error('regen refine →', e.message); }
+      }
+      try { t.fiche = await callClaude(buildConceptSheet({ template: t, sources: srcs })); } catch (e) { console.error('regen fiche →', e.message); }
+      store.save(db);
+    } catch (e) { console.error('regenTemplate →', e.message); }
+  })();
+}
+
 // Fusionne un template dans un autre (nettoyage des doublons) : transfère
 // vidéos + concepts + entrées inspiration, cumule force/niches, supprime le 1er.
 async function handleTemplateMerge(input) {
@@ -342,6 +368,7 @@ async function handleTemplateMerge(input) {
   into.fiche = null; // fiche à régénérer sur l'ensemble
   db.templates = db.templates.filter((t) => t.id !== fromId);
   store.save(db);
+  regenTemplate(intoId); // en tâche de fond : ré-affine + régénère la fiche
   return { ok: true };
 }
 

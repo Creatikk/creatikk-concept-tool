@@ -708,8 +708,8 @@ window._openC = (id) => {
       ${f ? ficheCreator(f) : '<div class="muted">Fiche détaillée bientôt disponible.</div>'}
       <div style="margin:14px 0"><button class="ghost mini" onclick="renderResources()">🎁 Voir les ressources à utiliser (chargements Creatikk…)</button></div>
       <h3 style="margin:18px 0 8px; font-size:16px">🎬 Des vidéos qui ont cartonné avec ce concept</h3>
-      ${srcs.length ? srcs.map((s) => `<div class="rowline" style="margin:7px 0">${vidLink(s)}</div>`).join('') : '<div class="muted">—</div>'}
-      ${concepts.length ? '<h3 style="margin:18px 0 8px; font-size:16px">✍️ Scripts prêts à filmer</h3>' + concepts.map((c, i) => conceptCard(c, 'cc' + i)).join('') : ''}
+      ${srcs.length ? [...srcs].sort((a, b) => ((b.meta && b.meta.views) || 0) - ((a.meta && a.meta.views) || 0)).slice(0, 8).map((s) => `<div class="rowline" style="margin:7px 0">${vidLink(s)}</div>`).join('') + (srcs.length > 8 ? `<div class="muted" style="font-size:12px; margin-top:4px">+ ${srcs.length - 8} autres vidéos</div>` : '') : '<div class="muted">—</div>'}
+      ${concepts.length ? '<h3 style="margin:18px 0 8px; font-size:16px">✍️ Scripts prêts à filmer</h3>' + concepts.slice(0, 6).map((c, i) => conceptCard(c, 'cc' + i)).join('') + (concepts.length > 6 ? `<div class="muted" style="margin-top:10px">+ ${concepts.length - 6} autres scripts — reviens en piocher quand tu veux.</div>` : '') : ''}
     </div>`;
   window.scrollTo(0, 0);
 };
