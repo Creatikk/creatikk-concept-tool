@@ -111,6 +111,17 @@
   <!-- TEMPLATES -->
   <section id="paneT" class="hidden">
     <div class="card"><label>Filtrer par niche</label><input id="tFilter" placeholder="ex : fitness, business… (vide = tout)" /></div>
+    <div class="card" id="mergeCard" style="display:none">
+      <label>🔗 Fusionner deux concepts en doublon</label>
+      <div class="row">
+        <div><select id="mgFrom"></select></div>
+        <div style="flex:0 0 auto; align-self:center; padding-bottom:10px" class="muted">→ dans →</div>
+        <div><select id="mgInto"></select></div>
+        <button id="mgGo" style="flex:0 0 auto">Fusionner</button>
+      </div>
+      <div class="muted" style="font-size:12px; margin-top:6px">Le 1ᵉʳ concept est absorbé par le 2ᵉ (ses vidéos, concepts et stats sont transférés), puis supprimé.</div>
+      <div id="mgErr" class="err" style="margin-top:6px"></div>
+    </div>
     <div id="resT"></div>
   </section>
 
@@ -402,9 +413,32 @@ async function loadTemplates() {
   try {
     const [t, s, c, a] = await Promise.all(['/templates', '/sources', '/concepts', '/assets'].map((u) => fetch(u).then((r) => r.json())));
     TDATA = { templates: t, sources: s, concepts: c, assets: a };
+    fillMergeSelects();
     renderTemplateList();
   } catch (e) { $('#resT').innerHTML = '<div class="err">' + e.message + '</div>'; }
 }
+function fillMergeSelects() {
+  const card = $('#mergeCard');
+  if (!TDATA.templates || TDATA.templates.length < 2) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  const opts = TDATA.templates.map((t) => `<option value="${t.id}">${esc(t.nom)} · ${TDATA.sources.filter((s) => s.templateId === t.id).length} vidéo(s)</option>`).join('');
+  $('#mgFrom').innerHTML = opts;
+  $('#mgInto').innerHTML = opts;
+  if ($('#mgInto').options.length > 1) $('#mgInto').selectedIndex = 1;
+}
+$('#mgGo').onclick = async () => {
+  const fromId = $('#mgFrom').value, intoId = $('#mgInto').value; $('#mgErr').textContent = '';
+  if (fromId === intoId) { $('#mgErr').textContent = 'Choisis deux concepts différents.'; return; }
+  const fromNom = $('#mgFrom').selectedOptions[0].textContent, intoNom = $('#mgInto').selectedOptions[0].textContent;
+  if (!confirm(`Fusionner « ${fromNom} » dans « ${intoNom} » ?\nLe premier sera supprimé, ses vidéos transférées au second.`)) return;
+  $('#mgGo').disabled = true; $('#mgGo').innerHTML = '<span class="spin"></span>';
+  try {
+    const r = await (await fetch('/template-merge', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ fromId, intoId }) })).json();
+    if (r.error) throw new Error(r.error);
+    await loadTemplates();
+  } catch (e) { $('#mgErr').textContent = e.message; }
+  $('#mgGo').disabled = false; $('#mgGo').textContent = 'Fusionner';
+};
 function tplStats(id) {
   const srcs = TDATA.sources.filter((s) => s.templateId === id);
   const vv = srcs.map((s) => s.meta?.views || 0);

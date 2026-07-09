@@ -87,6 +87,13 @@ async function handleAnalyze(input) {
   // Fusion : ce concept correspond-il à un template connu ?
   const cls = await callClaude(buildClassify({ sujet: analysis.sujet, templateReutilisable: analysis.templateReutilisable, existing: db.templates }));
   let template = cls.match && cls.templateId ? db.templates.find((t) => t.id === cls.templateId) : null;
+  // Garde-fou anti-doublon : si le classeur crée un "nouveau" template mais avec
+  // un nom quasi identique à un template existant, on fusionne dedans (évite les
+  // "3 fois le même concept").
+  if (!template && cls.nom) {
+    const norm = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    template = db.templates.find((t) => norm(t.nom) === norm(cls.nom)) || null;
+  }
   const merged = !!template;
   if (template) {
     template.force = (template.force || 1) + 1;
@@ -316,6 +323,28 @@ async function handleMarketDelete(input) {
   return { ok: true };
 }
 
+// Fusionne un template dans un autre (nettoyage des doublons) : transfère
+// vidéos + concepts + entrées inspiration, cumule force/niches, supprime le 1er.
+async function handleTemplateMerge(input) {
+  const { fromId, intoId } = input || {};
+  if (!fromId || !intoId || fromId === intoId) throw new Error('Choisis deux concepts différents.');
+  const db = store.load();
+  const from = db.templates.find((t) => t.id === fromId);
+  const into = db.templates.find((t) => t.id === intoId);
+  if (!from || !into) throw new Error('Concept introuvable.');
+  for (const s of db.sources) if (s.templateId === fromId) s.templateId = intoId;
+  for (const c of db.concepts) if (c.templateId === fromId) c.templateId = intoId;
+  for (const m of db.market) if (m.templateId === fromId) m.templateId = intoId;
+  into.force = (into.force || 0) + (from.force || 0);
+  into.niches = Array.from(new Set([...(into.niches || []), ...(from.niches || [])]));
+  into.exempleIds = Array.from(new Set([...(into.exempleIds || []), ...(from.exempleIds || [])]));
+  into.conceptIds = Array.from(new Set([...(into.conceptIds || []), ...(from.conceptIds || [])]));
+  into.fiche = null; // fiche à régénérer sur l'ensemble
+  db.templates = db.templates.filter((t) => t.id !== fromId);
+  store.save(db);
+  return { ok: true };
+}
+
 // ── MOTION SCAN sur la vidéo du créateur ───────────────────────────
 // Ressource « clé en main » : le créateur envoie SA vidéo, ffmpeg colle
 // l'overlay de scan Creatikk (pré-rendu transparent, en boucle) par-dessus,
@@ -429,6 +458,7 @@ const server = http.createServer(async (req, res) => {
     if (u === '/market-add' && req.method === 'POST') return json(res, 200, await handleMarketAdd(await readBody(req)));
     if (u === '/market-import-sources' && req.method === 'POST') return json(res, 200, await handleMarketImportSources());
     if (u === '/market-delete' && req.method === 'POST') return json(res, 200, await handleMarketDelete(await readBody(req)));
+    if (u === '/template-merge' && req.method === 'POST') return json(res, 200, await handleTemplateMerge(await readBody(req)));
     if (u === '/scan-video' && req.method === 'POST') return json(res, 200, await handleScanVideo(req));
     if (u === '/scan-selftest' && req.method === 'GET') {
       // Diagnostic : compose le scan sur un clip GÉNÉRÉ (pas d'upload) → révèle
